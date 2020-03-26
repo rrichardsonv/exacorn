@@ -28,26 +28,76 @@ defmodule ExAcorn do
   defp end_col(%{loc: %SourceLocation{end: %Position{column: col}}}), do: col
 
   defp parse_statement(js, line, col, source) do
-    with {:ok, tokens, rem_js, _, {end_line, end_col}, _size} <-
+    with {:ok, tokens, rem_js, _, {end_line, end_col}, size} <-
            IO.inspect(Statement.parse(js), label: "---------"),
          {:ok, rem_text, token_map} <- format_tokens(tokens),
          {:ok, statement, statement_source} <-
-           do_parse_statement(token_map, {line, col}, {end_line, end_col + 1}) do
+           do_parse_statement(token_map, {line, col}, {end_line, end_col, size}) do
       {rem_text <> rem_js, statement, source <> statement_source}
     end
   end
 
-  defp do_parse_statement(%{empty_statement: source}, start_coord, end_coord)
-       when is_list(source) do
-    binary_source = Enum.join(source)
-    location = to_loc(binary_source, start_coord, end_coord)
-    {:ok, JBuild.empty_statement(location), binary_source}
+  defp srt(a, b) when a > b, do: 1
+  defp srt(a, b) when a < b, do: -1
+  defp srt(a, b) when a == b, do: 0
+
+  defp do_parse_statement(
+         statement,
+         {start_line, _start_col} = start_coord,
+         {end_line, end_col, match_size}
+       ) do
+    case {srt(end_line, start_line), srt(match_size, end_col)} do
+      {0, 1} ->
+        do_parse_statement(statement, start_coord, {end_line, match_size})
+
+      {1, 0} ->
+        do_parse_statement(statement, start_coord, {end_line, 0})
+
+      _ ->
+        do_parse_statement(statement, start_coord, {end_line, end_col})
+    end
+  end
+
+  defp do_parse_statement(%{empty_statement: _source}, start_coord, end_coord) do
+    location = to_loc(";", start_coord, end_coord)
+    {:ok, JBuild.empty_statement(location), ";"}
+  end
+
+  defp do_parse_statement(
+         %{block_statement: [{:open_brace, _}, {:close_brace, _}]},
+         start_coord,
+         end_coord
+       ) do
+    location = to_loc("{}", start_coord, end_coord)
+    {:ok, JBuild.block_statement([], location), "{}"}
+  end
+
+  defp do_parse_statement(
+         %{
+           block_statement: [
+             {:open_brace, _},
+             {:children, {statement_children, {cend_l, cend_c}, _child_match_size}},
+             {:close_brace, _}
+           ]
+         },
+         start_coord,
+         end_coord
+       ) do
+    with {:ok, children, ch_source} <-
+           do_parse_statement(
+             Map.new(statement_children),
+             start_coord,
+             {cend_l, cend_c}
+           ) do
+      location = to_loc("{#{ch_source}}", start_coord, end_coord)
+      {:ok, JBuild.block_statement(List.wrap(children), location), "{#{ch_source}}"}
+    end
   end
 
   defp to_pos({l, c}), do: JBuild.position(l, c)
 
-  defp to_loc(source, {_, _} = start_coord, {_, _} = end_coord),
-    do: apply(JBuild, :source_location, [source | Enum.map([start_coord, end_coord], &to_pos/1)])
+  defp to_loc(source, {_, _} = _start_coord, {_, _} = _end_coord),
+    do: apply(JBuild, :source_location, [source | Enum.map([{1, 0}, {1, 0}], &to_pos/1)])
 
   # defp do_parse_statement(";" <> js, line, col, _source),
   #   do: {JBuild.empty_statement(), {JBuild.position(line, col + 1), ";"}, js}

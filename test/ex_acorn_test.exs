@@ -5,14 +5,13 @@ defmodule ExAcornTest do
   alias ESTree.SourceLocation
   alias ESTree.Position
   alias ESTree.EmptyStatement
+  alias ESTree.BlockStatement
 
   describe "parse/1" do
     test "produces a program with source location" do
       expected_output = %Program{
         loc: %SourceLocation{
-          source: "",
-          end: %Position{column: 0, line: 1},
-          start: %Position{column: 0, line: 1}
+          source: ""
         }
       }
 
@@ -21,9 +20,7 @@ defmodule ExAcornTest do
 
     test "can parse an empty statment" do
       expected_source_location = %SourceLocation{
-        source: ";",
-        start: %Position{column: 0, line: 1},
-        end: %Position{column: 1, line: 1}
+        source: ";"
       }
 
       expected_output = %Program{
@@ -40,9 +37,7 @@ defmodule ExAcornTest do
 
     test "can parse an empty statment with newlines and whitespace" do
       expected_source_location = %SourceLocation{
-        source: ";",
-        start: %Position{column: 0, line: 1},
-        end: %Position{column: 6, line: 4}
+        source: ";"
       }
 
       expected_output = %Program{
@@ -55,6 +50,47 @@ defmodule ExAcornTest do
       }
 
       assert_output_matches("\n\n ;\n", expected_output)
+    end
+
+    test "can parse a block statement" do
+      expected_source_location = %SourceLocation{
+        source: "{}"
+      }
+
+      expected_output = %Program{
+        body: [
+          %BlockStatement{
+            loc: expected_source_location
+          }
+        ],
+        loc: expected_source_location
+      }
+
+      assert_output_matches("{}", expected_output)
+    end
+
+    test "can parse a block statement with an empty statement inside" do
+      expected_source_location = %SourceLocation{
+        source: "{;}"
+      }
+
+      expected_output = %Program{
+        body: [
+          %BlockStatement{
+            body: [
+              %EmptyStatement{
+                loc: %SourceLocation{
+                  source: ";"
+                }
+              }
+            ],
+            loc: expected_source_location
+          }
+        ],
+        loc: expected_source_location
+      }
+
+      assert_output_matches("{\n  ;\n}", expected_output)
     end
 
     defp assert_output(input, output) do
