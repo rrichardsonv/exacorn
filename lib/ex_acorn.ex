@@ -30,13 +30,14 @@ defmodule ExAcorn do
   defp parse_statement(js, line, col, source) do
     with {:ok, tokens, rem_js, _, {end_line, end_col}, _size} <-
            IO.inspect(Statement.parse(js), label: "---------"),
+         {:ok, rem_text, token_map} <- format_tokens(tokens),
          {:ok, statement, statement_source} <-
-           do_parse_statement(tokens, {line, col}, {end_line, end_col + 1}) do
-      {rem_js, statement, source <> statement_source}
+           do_parse_statement(token_map, {line, col}, {end_line, end_col + 1}) do
+      {rem_text <> rem_js, statement, source <> statement_source}
     end
   end
 
-  defp do_parse_statement([empty_statement: source], start_coord, end_coord)
+  defp do_parse_statement(%{empty_statement: source}, start_coord, end_coord)
        when is_list(source) do
     binary_source = Enum.join(source)
     location = to_loc(binary_source, start_coord, end_coord)
@@ -55,4 +56,9 @@ defmodule ExAcorn do
     loc_end = JBuild.position(line, col)
     {loc_end, loc_source}
   end
+
+  defp format_tokens(tokens),
+    do:
+      {:ok, Keyword.get(tokens, :rest_value, ""),
+       Keyword.delete(tokens, :rest_value) |> Map.new()}
 end

@@ -38,6 +38,25 @@ defmodule ExAcornTest do
       assert_output_matches(";", expected_output)
     end
 
+    test "can parse an empty statment with newlines and whitespace" do
+      expected_source_location = %SourceLocation{
+        source: ";",
+        start: %Position{column: 0, line: 1},
+        end: %Position{column: 6, line: 4}
+      }
+
+      expected_output = %Program{
+        body: [
+          %EmptyStatement{
+            loc: expected_source_location
+          }
+        ],
+        loc: expected_source_location
+      }
+
+      assert_output_matches("\n\n ;\n", expected_output)
+    end
+
     defp assert_output(input, output) do
       parsed = ExAcorn.parse(input)
 
