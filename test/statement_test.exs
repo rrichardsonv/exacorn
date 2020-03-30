@@ -41,10 +41,58 @@ defmodule ExAcorn.StatementTest do
       if (i === 1 && j === 1) {
          continue loop1;
       } else {
-        break "banana";
+        break
       }
       log('(for future refrence;) i', `= + ${i}` + ", j = " + j)
     }
+    }
+    """
+
+    assert :foo == S.parse(js)
+  end
+
+  test "while" do
+    js = """
+    var foo = -1;
+    let res = 0;
+    while (++foo < 10) { res + 2 }
+
+    do {
+      console.log(res);
+      res = (function(x){x - 2})(res);
+    } while(res>=0);
+    """
+
+    assert :foo == S.parse(js)
+  end
+
+  test "params" do
+    js = """
+    function b(a, b, ...c) {
+      async function do_the_thing({abc: def = 1}) {
+        console.log(def);
+      }
+
+      return do_the_thing(c.forEach(foo => foo + a + b));
+    }
+    """
+
+    assert :foo == S.parse(js)
+  end
+
+  test "class declaration" do
+    js = """
+    class Foo extends React.Component {
+      render(){
+        return null;
+      }
+    }
+
+
+    export default class Foo extends React.Component {
+      render(){
+        return null;
+      }
     }
     """
 
