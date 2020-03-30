@@ -23,12 +23,16 @@ defmodule ExAcorn.StatementTest do
       }
     }
 
-    function object_return() {
-      const state = {
-        bah: "humbug"
+    function object_return(foo) {
+      if(!foo) return null
+      try {
+       const state = {
+          bah: "humbug"
+        }
+        return state
+      } catch (e) {
+        throw e
       }
-
-      return state
     }
 
     loop1 : for (i = 0; i < 3; i++) {      //The first for statement is labeled "loop1"
@@ -36,6 +40,8 @@ defmodule ExAcorn.StatementTest do
     for (j = 0; j < 3; j++) {   //The second for statement is labeled "loop2"
       if (i === 1 && j === 1) {
          continue loop1;
+      } else {
+        break "banana";
       }
       log('(for future refrence;) i', `= + ${i}` + ", j = " + j)
     }
