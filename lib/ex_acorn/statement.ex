@@ -10,6 +10,7 @@ defmodule ExAcorn.Statement do
 
   eol = ascii_char([?\n]) |> ignore() |> label("eol")
   semi = ascii_char([?;]) |> tag(:semi)
+  period = ascii_char([?.]) |> tag(:period)
 
   open_curly = ascii_char([?{])
   close_curly = ascii_char([?}])
@@ -40,7 +41,8 @@ defmodule ExAcorn.Statement do
         {:not, ?(},
         {:not, ?)},
         {:not, ?:},
-        {:not, ??}
+        {:not, ??},
+        {:not, ?.}
       ],
       min: 1
     )
@@ -304,6 +306,7 @@ defmodule ExAcorn.Statement do
         optional(whitespace) |> parsec(:for_statement),
         optional(whitespace) |> parsec(:switch_statement),
         optional(whitespace) |> parsec(:function_statement),
+        optional(whitespace) |> parsec(:anonymous_function),
         optional(whitespace) |> parsec(:variable_statement) |> optional(eq),
         optional(whitespace) |> parsec(:return_statement),
         optional(whitespace) |> parsec(:throw_statement),
@@ -313,8 +316,14 @@ defmodule ExAcorn.Statement do
         optional(whitespace) |> parsec(:label_statement),
         parsec(:block),
         ignore(whitespace),
-        ascii_string([not: ?{, not: ?}], min: 1) |> concat(whitespace),
-        ascii_string([not: ?{, not: ?}], min: 1)
+        optional(whitespace) |> concat(unknown_text),
+        optional(whitespace) |> concat(comma),
+        optional(whitespace) |> concat(semi),
+        optional(whitespace) |> concat(period),
+        optional(whitespace) |> concat(open_paren),
+        optional(whitespace) |> concat(close_paren),
+        optional(whitespace) |> concat(colon),
+        optional(whitespace) |> concat(question_mark)
       ])
     )
     |> wrap()
@@ -379,6 +388,17 @@ defmodule ExAcorn.Statement do
     |> concat(space_chars)
     |> concat(fn_declaration)
     |> tag(:function_statement)
+  )
+
+  defcombinatorp(
+    :anonymous_function,
+    string("function")
+    |> label("function kw")
+    |> concat(space_chars)
+    |> concat(fn_params)
+    |> optional(space_chars)
+    |> concat(parsec(:block))
+    |> tag(:anonymous_function)
   )
 
   function_statement = parsec(:function_statement)
@@ -470,8 +490,9 @@ defmodule ExAcorn.Statement do
       unknown_text,
       comma,
       semi,
-      open_brace,
+      period,
       close_brace,
+      open_brace,
       colon,
       question_mark,
       open_paren,
