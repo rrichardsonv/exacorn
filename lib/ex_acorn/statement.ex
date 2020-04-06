@@ -1,103 +1,8 @@
 defmodule ExAcorn.Statement do
   import NimbleParsec
-
-  # utils
-  whitespace = ascii_string([?\s, ?\t, ?\n, ?\r], min: 1) |> ignore() |> label("whitespace")
-  space_chars = ascii_string([?\s, ?\t, ?\r], min: 1) |> ignore() |> label("space_chars")
-
-  non_whitespace_char =
-    ascii_string([not: ?\s, not: ?\t, not: ?\n, not: ?\r], min: 1) |> label("non_whitespace")
-
-  eol = ascii_char([?\n]) |> ignore() |> label("eol")
-  expression_boundary = ascii_char([?\n, ?;]) |> ignore() |> label("expression_boundary")
-  semi = ascii_char([?;]) |> tag(:semi)
-  period = ascii_char([?.]) |> tag(:period)
-
-  open_curly = ascii_char([?{])
-  close_curly = ascii_char([?}])
-
-  open_brace = open_curly |> tag(:open_brace)
-  close_brace = close_curly |> tag(:close_brace)
-
-  colon = ascii_char([?:]) |> tag(:colon)
-  comma = ascii_char([?,]) |> tag(:comma)
-  eq = ascii_char([?=]) |> tag(:eq)
-  question_mark = ascii_char([??]) |> tag(:question_mark)
-
-  double_quote = ascii_char([?"]) |> ignore() |> label("double_quote")
-  single_quote = ascii_char([?']) |> ignore() |> label("single_quote")
-  backtick_quote = ascii_char([?`]) |> ignore() |> label("backtick_quote")
-
-  unknown_text =
-    ascii_string(
-      [
-        10..255,
-        {:not, ?"},
-        {:not, ?'},
-        {:not, ?`},
-        {:not, ?,},
-        {:not, ?;},
-        {:not, ?}},
-        {:not, ?{},
-        {:not, ?(},
-        {:not, ?)},
-        {:not, ?:},
-        {:not, ??},
-        {:not, ?.}
-      ],
-      min: 1
-    )
-    |> tag(:unknown_text)
-
-  defcombinatorp(
-    :double_quoted_text,
-    double_quote
-    |> repeat(lookahead_not(double_quote) |> concat(ascii_string([0..255, {:not, ?"}], min: 1)))
-    |> concat(double_quote)
-    |> tag(:quoted_string)
-  )
-
-  defcombinatorp(
-    :single_quoted_text,
-    single_quote
-    |> repeat(lookahead_not(single_quote) |> concat(ascii_string([0..255, {:not, ?'}], min: 1)))
-    |> concat(single_quote)
-    |> tag(:quoted_string)
-  )
-
-  defcombinatorp(
-    :backtick_quoted_text,
-    backtick_quote
-    |> repeat(lookahead_not(backtick_quote) |> concat(ascii_string([0..255, {:not, ?`}], min: 1)))
-    |> concat(backtick_quote)
-    |> tag(:quoted_template)
-  )
-
-  quoted_string =
-    choice([
-      parsec(:double_quoted_text),
-      parsec(:single_quoted_text),
-      parsec(:backtick_quoted_text)
-    ])
-
-  inline_comment =
-    ignore(string("//"))
-    |> optional(space_chars)
-    |> concat(ascii_string([0..255, {:not, ?\n}], min: 0))
-    |> lookahead(eol)
-
-  block_comment_content =
-    ascii_string([0..255, {:not, ?*}], min: 1)
-    |> optional(ascii_char([?*]) |> lookahead_not(ascii_char([?/])))
-
-  block_comment =
-    ignore(string("/*"))
-    |> repeat(lookahead_not(string("*/")) |> concat(block_comment_content))
-    |> ignore(string("*/"))
-
-  defcombinatorp(:comment, choice([inline_comment, block_comment]) |> unwrap_and_tag(:comment))
-
-  comment = parsec(:comment)
+  import ExAcorn.Utils
+  import ExAcorn.Common
+  import ExAcorn.Statement.SwitchStatement
 
   line_text =
     ascii_char([?$, ?_, ?a..?z, ?A..?Z])
@@ -106,43 +11,20 @@ defmodule ExAcorn.Statement do
     |> label("line_text")
 
   maybe_namespaced_line_text =
-    repeat(lookahead_not(whitespace) |> concat(line_text) |> optional(ignore(ascii_char([?.]))))
+    repeat(lookahead_not(whitespace()) |> concat(line_text) |> optional(ignore(ascii_char([?.]))))
 
-  open_paren = ascii_char([?(]) |> tag(:open_paren)
-  close_paren = ascii_char([?)]) |> tag(:close_paren)
-
-  async_decorator = string("async") |> concat(whitespace) |> label("async")
-
-  # defcombinatorp(
-  #   :if_statement,
-  #   ignore(string("if"))
-  #   |> optional(space_chars)
-  #   |> concat(parsec(:condition))
-  #   |> optional(space_chars)
-  #   |> choice([
-  #     parsec(:return_statement)
-  #     |> optional(
-  #       space_chars
-  #       |> concat(ascii_string([not: ?;, not: ?\n], min: 1))
-  #     )
-  #     |> concat(ignore(ascii_char([?;, ?\n]))),
-  #     parsec(:block)
-  #     |> ignore(whitespace)
-  #     |> optional(parsec(:else_statement))
-  #   ])
-  #   |> tag(:if_statement)
-  # )
+  async_decorator = string("async") |> concat(whitespace()) |> label("async")
 
   defcombinatorp(
     :if_statement,
     ignore(string("if"))
-    |> optional(whitespace)
+    |> optional(whitespace())
     |> concat(parsec(:test))
-    |> optional(whitespace)
+    |> optional(whitespace())
     |> concat(parsec(:statement) |> tag(:consequent))
-    |> optional(whitespace)
+    |> optional(whitespace())
     |> choice([
-      ignore(string("else")) |> optional(whitespace) |> parsec(:statement) |> tag(:alternate),
+      ignore(string("else")) |> optional(whitespace()) |> parsec(:statement) |> tag(:alternate),
       empty() |> tag(:alternate)
     ])
     |> tag(:if_statement)
@@ -153,13 +35,13 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :else_statement,
     choice([
-      ignore(string("else")) |> optional(whitespace) |> parsec(:statement) |> tag(:alternate),
+      ignore(string("else")) |> optional(whitespace()) |> parsec(:statement) |> tag(:alternate),
       empty() |> tag(:alternate)
     ])
   )
 
-  maybe_label_identifier = optional(space_chars |> concat(line_text)) |> optional(space_chars)
-  end_of_statement = choice([ignore(eol), ignore(semi)]) |> optional(eol)
+  maybe_label_identifier = optional(space_chars() |> concat(line_text)) |> optional(space_chars())
+  end_of_statement = choice([ignore(eol()), ignore(semi())]) |> optional(eol())
 
   # break
   defcombinatorp(
@@ -187,109 +69,15 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :with_statement,
     ignore(string("with"))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:condition))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:block))
     |> tag(:with_statement)
   )
 
   with_statement = parsec(:with_statement)
 
-  # switch
-  switch_case_kw = string("case")
-  switch_case_df_kw = string("default")
-
-  switch_consequent =
-    repeat(
-      lookahead_not(
-        choice([
-          switch_case_kw,
-          switch_case_df_kw,
-          close_brace
-        ])
-      )
-      |> choice([
-        ignore(space_chars),
-        quoted_string,
-        comment,
-        ascii_string([not: ?\n, not: ?;], min: 1)
-      ])
-      |> concat(end_of_statement)
-      |> optional(space_chars)
-    )
-    |> tag(:consequent)
-
-  defcombinatorp(
-    :switch_case,
-    choice([
-      optional(space_chars)
-      |> ignore(switch_case_kw)
-      |> optional(whitespace)
-      |> repeat(
-        lookahead_not(colon)
-        |> choice([
-          ignore(eol),
-          ignore(space_chars),
-          quoted_string,
-          comment,
-          ascii_string([not: ?:, not: ?\n], min: 1)
-        ])
-      )
-      |> tag(:test),
-      ignore(switch_case_df_kw) |> tag(:test)
-    ])
-    |> optional(whitespace)
-    |> ignore(colon)
-    |> optional(whitespace)
-    |> concat(switch_consequent)
-    |> tag(:switch_case)
-  )
-
-  defcombinatorp(
-    :empty_switch_case,
-    switch_case_kw
-    |> optional(whitespace)
-    |> repeat(lookahead_not(colon) |> concat(ascii_string([not: ?:], min: 1)))
-    |> optional(whitespace)
-    |> ignore(colon)
-    |> lookahead(
-      choice([
-        switch_case_kw,
-        switch_case_df_kw
-      ])
-    )
-    |> tag(:consequent)
-  )
-
-  defcombinatorp(
-    :switch_cases,
-    ignore(open_curly)
-    |> optional(whitespace)
-    |> repeat(
-      lookahead_not(close_curly)
-      |> optional(space_chars)
-      |> choice([
-        parsec(:switch_case),
-        parsec(:empty_switch_case)
-      ])
-      |> optional(whitespace)
-    )
-    |> tag(:cases)
-  )
-
-  defcombinatorp(
-    :switch_statement,
-    ignore(string("switch"))
-    |> optional(whitespace)
-    |> concat(parsec(:discriminant))
-    |> optional(whitespace)
-    |> concat(parsec(:switch_cases))
-    |> optional(whitespace)
-    |> ignore(close_brace)
-  )
-
-  switch_statement = parsec(:switch_statement) |> tag(:switch_statement)
   # return
   defcombinatorp(:return_statement, string("return") |> tag(:return_statement))
   # throw
@@ -299,9 +87,9 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :try_statement,
     ignore(string("try"))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:block))
-    |> ignore(whitespace)
+    |> ignore(whitespace())
     |> parsec(:catch_clause)
     |> tag(:try_statement)
   )
@@ -311,9 +99,9 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :catch_clause,
     string("catch")
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:expression))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> parsec(:block)
     |> tag(:catch_clause)
   )
@@ -321,13 +109,13 @@ defmodule ExAcorn.Statement do
   # while
   while_clause =
     ignore(string("while"))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:condition))
 
   defcombinatorp(
     :while_statement,
     while_clause
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:block))
     |> tag(:while_statement)
   )
@@ -338,9 +126,9 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :do_statement,
     ignore(string("do"))
-    |> optional(space_chars)
+    |> optional(whitespace())
     |> concat(parsec(:block))
-    |> optional(whitespace)
+    |> optional(whitespace())
     |> concat(while_clause)
     |> tag(:do_statement)
   )
@@ -351,9 +139,9 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :for_statement,
     ignore(string("for"))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:expression))
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:block))
     |> tag(:for_statement)
   )
@@ -362,72 +150,46 @@ defmodule ExAcorn.Statement do
 
   # debugger
   debugger_statement = string("debugger") |> tag(:debugger_statement)
-  # const, var, let
-  multiple_decl_separator = comma |> optional(whitespace)
-
-  var_declare =
-    line_text
-    |> concat(ascii_string([?\s, ?\t], min: 0) |> ignore() |> label("whitespace"))
-    |> repeat(ignore(multiple_decl_separator) |> concat(line_text))
-
-  assigned_var =
-    ignore(eq)
-    |> optional(whitespace)
-    |> lookahead(non_whitespace_char)
-    |> tag(:assignment)
-
-  instantiated_var =
-    end_of_statement
-    |> tag(:no_assign)
-
-  defcombinatorp(
-    :variable_statement,
-    choice([string("let"), string("const"), string("var")])
-    |> ignore(whitespace)
-    |> concat(var_declare)
-    |> optional(space_chars)
-    |> choice([assigned_var, instantiated_var])
-    |> tag(:variable)
-  )
 
   # [async] function, function*
 
   defcombinatorp(
     :_block,
-    ignore(open_curly)
+    ignore(open_curly())
     |> repeat(
-      lookahead_not(close_curly)
+      lookahead_not(close_curly())
       |> choice([
-        optional(whitespace) |> parsec(:comment),
-        optional(whitespace) |> concat(quoted_string),
-        optional(whitespace) |> parsec(:if_statement),
-        optional(whitespace) |> parsec(:try_statement),
-        optional(whitespace) |> parsec(:for_statement),
-        optional(whitespace) |> parsec(:switch_statement),
-        optional(whitespace) |> parsec(:function_statement),
-        optional(whitespace) |> parsec(:anonymous_function),
-        optional(whitespace) |> parsec(:variable_statement) |> optional(eq),
-        optional(whitespace) |> parsec(:return_statement),
-        optional(whitespace) |> parsec(:throw_statement),
-        optional(whitespace) |> parsec(:break_statement),
-        optional(whitespace) |> parsec(:continue_statement),
-        optional(whitespace) |> parsec(:function_call),
-        optional(whitespace) |> parsec(:label_statement),
+        optional(whitespace()) |> concat(comment()),
+        optional(whitespace()) |> concat(quoted_string()),
+        optional(whitespace()) |> parsec(:if_statement),
+        optional(whitespace()) |> parsec(:try_statement),
+        optional(whitespace()) |> parsec(:for_statement),
+        optional(whitespace()) |> concat(switch_statement()),
+        optional(whitespace()) |> parsec(:function_statement),
+        optional(whitespace()) |> parsec(:anonymous_function),
+        optional(whitespace()) |> concat(variable_statement()),
+        optional(whitespace()) |> parsec(:return_statement),
+        optional(whitespace()) |> parsec(:throw_statement),
+        optional(whitespace()) |> parsec(:break_statement),
+        optional(whitespace()) |> parsec(:continue_statement),
+        optional(whitespace()) |> parsec(:function_call),
+        optional(whitespace()) |> parsec(:label_statement),
         parsec(:block_statement),
-        ignore(whitespace),
-        optional(whitespace) |> concat(unknown_text),
-        optional(whitespace) |> concat(comma),
-        optional(whitespace) |> concat(semi),
-        optional(whitespace) |> concat(period),
-        optional(whitespace) |> concat(open_paren),
-        optional(whitespace) |> concat(close_paren),
-        optional(whitespace) |> concat(colon),
-        optional(whitespace) |> concat(question_mark)
+        ignore(whitespace()),
+        optional(whitespace()) |> concat(non_control_char()),
+        optional(whitespace()) |> concat(comma()),
+        optional(whitespace()) |> concat(semi()),
+        optional(whitespace()) |> concat(period()),
+        optional(whitespace()) |> concat(open_paren()),
+        optional(whitespace()) |> concat(close_paren()),
+        optional(whitespace()) |> concat(colon()),
+        optional(whitespace()) |> concat(eq()),
+        optional(whitespace()) |> concat(question_mark())
       ])
     )
     |> wrap()
-    |> optional(whitespace)
-    |> ignore(close_curly)
+    |> optional(whitespace())
+    |> ignore(close_curly())
   )
 
   defcombinatorp(:block, parsec(:_block) |> unwrap_and_tag(:block))
@@ -435,20 +197,20 @@ defmodule ExAcorn.Statement do
 
   defcombinatorp(
     :paren_group,
-    ignore(open_paren)
+    ignore(open_paren())
     |> repeat(
-      lookahead_not(close_paren)
+      lookahead_not(close_paren())
       |> choice([
-        optional(whitespace) |> parsec(:comment),
-        optional(whitespace) |> concat(quoted_string),
-        optional(whitespace) |> parsec(:variable_statement) |> optional(eq),
+        optional(whitespace()) |> concat(comment()),
+        optional(whitespace()) |> concat(quoted_string()),
+        optional(whitespace()) |> concat(variable_statement()) |> optional(eq()),
         parsec(:expression),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
     )
     |> wrap()
-    |> optional(whitespace)
-    |> ignore(close_paren)
+    |> optional(whitespace())
+    |> ignore(close_paren())
   )
 
   defcombinatorp(:expression, parsec(:paren_group) |> unwrap_and_tag(:expression))
@@ -460,14 +222,14 @@ defmodule ExAcorn.Statement do
 
   param =
     choice([
-      optional(gather_op) |> concat(line_text) |> ignore(comma) |> optional(whitespace),
+      optional(gather_op) |> concat(line_text) |> ignore(comma()) |> optional(whitespace()),
       ascii_string([0..255, {:not, ?)}], min: 1)
     ])
 
   fn_params =
-    ignore(open_paren)
-    |> repeat(lookahead_not(close_paren) |> concat(param))
-    |> ignore(close_paren)
+    ignore(open_paren())
+    |> repeat(lookahead_not(close_paren()) |> concat(param))
+    |> ignore(close_paren())
     |> tag(:params)
 
   fn_name =
@@ -476,9 +238,9 @@ defmodule ExAcorn.Statement do
 
   fn_declaration =
     fn_name
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(fn_params)
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:block))
 
   defcombinatorp(
@@ -488,7 +250,7 @@ defmodule ExAcorn.Statement do
       string("function*") |> label("generator kw"),
       string("function") |> label("function kw")
     ])
-    |> concat(space_chars)
+    |> concat(space_chars())
     |> concat(fn_declaration)
     |> tag(:function_statement)
   )
@@ -497,9 +259,9 @@ defmodule ExAcorn.Statement do
     :anonymous_function,
     string("function")
     |> label("function kw")
-    |> concat(space_chars)
+    |> concat(space_chars())
     |> concat(fn_params)
-    |> optional(space_chars)
+    |> optional(space_chars())
     |> concat(parsec(:block))
     |> tag(:anonymous_function)
   )
@@ -518,16 +280,16 @@ defmodule ExAcorn.Statement do
   # class
   extends_clause =
     ignore(string("extends"))
-    |> concat(whitespace)
+    |> concat(whitespace())
     |> concat(maybe_namespaced_line_text |> tag(:extends))
 
   defcombinatorp(
     :class_statement,
     ignore(string("class"))
-    |> concat(whitespace)
+    |> concat(whitespace())
     |> concat(maybe_namespaced_line_text |> tag(:classname))
-    |> optional(whitespace |> concat(extends_clause))
-    |> optional(whitespace)
+    |> optional(whitespace() |> concat(extends_clause))
+    |> optional(whitespace())
     |> parsec(:block)
     |> tag(:class_statement)
   )
@@ -537,14 +299,14 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :export_statement,
     ignore(string("export"))
-    |> optional(whitespace |> concat(string("default")))
-    |> concat(whitespace)
+    |> optional(whitespace() |> concat(string("default")))
+    |> concat(whitespace())
     |> choice([
-      parsec(:variable_statement),
+      variable_statement(),
       function_statement,
       class_statement,
-      whitespace,
-      unknown_text
+      whitespace(),
+      non_control_char()
     ])
     |> tag(:export_statement)
   )
@@ -558,23 +320,23 @@ defmodule ExAcorn.Statement do
 
   defcombinatorp(
     :label_statement,
-    optional(space_chars)
+    optional(space_chars())
     |> concat(line_text)
-    |> optional(space_chars)
-    |> ignore(colon)
-    |> optional(whitespace)
+    |> optional(space_chars())
+    |> ignore(colon())
+    |> optional(whitespace())
     |> tag(:label_statement)
   )
 
   defcombinatorp(
     :statement,
-    optional(whitespace)
+    optional(whitespace())
     |> choice([
       if_statement,
       break_statement,
       continue_statement,
       with_statement,
-      switch_statement,
+      switch_statement(),
       parsec(:return_statement),
       throw_statement,
       try_statement,
@@ -590,13 +352,13 @@ defmodule ExAcorn.Statement do
 
   root =
     choice([
-      comment,
-      quoted_string,
+      comment(),
+      quoted_string(),
       if_statement,
       break_statement,
       continue_statement,
       with_statement,
-      switch_statement,
+      switch_statement(),
       parsec(:return_statement),
       throw_statement,
       try_statement,
@@ -605,29 +367,30 @@ defmodule ExAcorn.Statement do
       for_statement,
       parsec(:label_statement),
       debugger_statement,
-      parsec(:variable_statement),
+      variable_statement(),
       function_statement,
       class_statement,
       export_statement,
       import_meta_statement,
       import_statement,
-      whitespace,
-      unknown_text,
-      comma,
-      semi,
-      period,
-      close_brace,
-      open_brace,
-      colon,
-      question_mark,
-      open_paren,
-      close_paren
+      whitespace(),
+      non_control_char(),
+      comma(),
+      semi(),
+      period(),
+      close_brace(),
+      open_brace(),
+      colon(),
+      question_mark(),
+      open_paren(),
+      close_paren(),
+      eq()
     ])
 
   defparsec(
     :parse,
-    optional(whitespace)
-    |> repeat(root)
+    optional(whitespace())
+    |> repeat(lookahead_not(eos()) |> concat(root))
     |> eos()
   )
 
