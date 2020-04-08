@@ -71,7 +71,6 @@ defmodule ExAcorn.Statement.SwitchStatement do
       |> tag(:switch_case)
 
     ignore(string("switch"))
-    |> tag(:switch_statement)
     |> optional(whitespace())
     |> concat(
       paren_group([

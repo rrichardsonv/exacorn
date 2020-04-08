@@ -121,6 +121,30 @@ defmodule ExAcorn.Common do
     |> ignore(close_paren())
   end
 
+  def curly_group(children) when is_list(children) do
+    ignore(open_curly())
+    |> repeat(
+      lookahead_not(close_curly())
+      |> choice(children ++ [ascii_string([not: ?{, not: ?}], min: 1)])
+    )
+    |> wrap()
+    |> optional(whitespace())
+    |> ignore(close_curly())
+  end
+
+  def local_block(inner_combinator \\ empty()) do
+    ignore(open_curly())
+    |> optional(whitespace())
+    |> repeat(
+      lookahead_not(close_curly())
+      |> choice([inner_combinator, ascii_string([not: ?{, not: ?}], min: 1)])
+    )
+    |> wrap()
+    |> optional(whitespace())
+    |> ignore(close_curly())
+    |> label("local_block")
+  end
+
   def variable_statement do
     choice([string("let"), string("const"), string("var")])
     |> ignore(whitespace())

@@ -135,4 +135,28 @@ defmodule ExAcorn.StatementTest do
     assert :ok == tree2
     assert tree1 == tree2
   end
+
+  test "switch inside switch" do
+    js1 = """
+    const expr = 'Papayas';
+    var b = 0;
+    switch (expr) {
+      case 'Oranges':
+        console.log('Oranges are $0.59 a pound.');
+        switch (true) {
+          case b > -1:
+            return 'a';
+          case b > -1:
+            return 'b';
+          default:
+            throw new Error('c');
+        }
+        break;
+      default:
+        console.log('Sorry, we are out of ' + expr + '.');
+    }
+    """
+
+    assert :ok == S.parse(js1)
+  end
 end
