@@ -21,6 +21,7 @@ defmodule ExAcorn.Statement do
   import ExAcorn.Statement.BlockStatement
 
   import ExAcorn.Expression.Function
+  import ExAcorn.Expression.Array
 
   defcombinatorp(
     :_statement,
@@ -36,7 +37,7 @@ defmodule ExAcorn.Statement do
       optional(whitespace()) |> concat(switch_statement()),
       optional(whitespace()) |> concat(throw_statement()),
       optional(whitespace()) |> concat(try_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(variable_statement()),
+      optional(whitespace()) |> concat(variable_statement(parsec(:_expression))),
       optional(whitespace()) |> concat(while_statement(parsec(:_block))),
       optional(whitespace()) |> concat(do_statement(parsec(:_block))),
       optional(whitespace()) |> concat(with_statement(parsec(:_block))),
@@ -55,7 +56,18 @@ defmodule ExAcorn.Statement do
 
   defcombinatorp(
     :_expression,
-    optional(whitespace()) |> concat(function_expression())
+    choice([
+      optional(whitespace()) |> concat(integer()) |> unwrap_and_tag(:integer),
+      optional(whitespace()) |> concat(float()) |> unwrap_and_tag(:float),
+      optional(whitespace()) |> concat(function_expression()),
+      optional(whitespace())
+      |> concat(
+        array_expression([
+          parsec(:_quotes_and_comments),
+          parsec(:_expression)
+        ])
+      )
+    ])
   )
 
   defcombinatorp(
@@ -66,6 +78,8 @@ defmodule ExAcorn.Statement do
       optional(whitespace()) |> concat(period()),
       optional(whitespace()) |> concat(open_paren()),
       optional(whitespace()) |> concat(close_paren()),
+      optional(whitespace()) |> concat(open_bracket()),
+      optional(whitespace()) |> concat(close_bracket()),
       optional(whitespace()) |> concat(colon()),
       optional(whitespace()) |> concat(eq()),
       optional(whitespace()) |> concat(question_mark()),
@@ -119,7 +133,9 @@ defmodule ExAcorn.Statement do
       close_brace(),
       open_brace(),
       open_paren(),
-      close_paren()
+      close_paren(),
+      open_bracket(),
+      close_bracket()
     ])
 
   defparsec(

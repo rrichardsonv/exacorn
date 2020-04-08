@@ -44,6 +44,12 @@ defmodule ExAcorn.Utils do
   defcombinatorp(:util_close_brace, ascii_char([?}]) |> tag(:close_brace))
   def close_brace, do: ascii_char([?}]) |> tag(:close_brace)
 
+  defcombinatorp(:util_open_bracket, ascii_char([?[]) |> tag(:open_bracket))
+  def open_bracket, do: ascii_char([?[]) |> tag(:open_bracket)
+
+  defcombinatorp(:util_close_bracket, ascii_char([?]]) |> tag(:close_bracket))
+  def close_bracket, do: ascii_char([?]]) |> tag(:close_bracket)
+
   defcombinatorp(:util_double_quote, ascii_char([?"]) |> ignore() |> label("double_quote"))
   def double_quote, do: ascii_char([?"]) |> ignore() |> label("double_quote")
 
@@ -58,6 +64,17 @@ defmodule ExAcorn.Utils do
 
   defcombinatorp(:util_close_paren, ascii_char([?)]) |> ignore() |> label("close_paren"))
   def close_paren, do: ascii_char([?)]) |> ignore() |> label("close_paren")
+
+  def integer,
+    do: ascii_string([?0..?9], min: 1) |> label("integer")
+
+  def float,
+    do:
+      ascii_string([?0..?9], min: 1)
+      |> concat(ascii_char([?.]))
+      |> concat(ascii_string([?0..?9], min: 1))
+      |> reduce({__MODULE__, :mixed_binary_to_string, []})
+      |> label("float")
 
   defcombinatorp(
     :util_non_whitespace_chars,
@@ -103,6 +120,8 @@ defmodule ExAcorn.Utils do
           {:not, ?{},
           {:not, ?(},
           {:not, ?)},
+          {:not, ?[},
+          {:not, ?]},
           {:not, ?:},
           {:not, ??},
           {:not, ?.},
@@ -120,6 +139,9 @@ defmodule ExAcorn.Utils do
     |> reduce({__MODULE__, :mixed_binary_to_string, []})
     |> label("line_text")
   end
+
+  def mixed_binary_to_string([char | _] = line_text) when is_binary(char),
+    do: line_text
 
   def mixed_binary_to_string([char | _] = line_text) when is_integer(char),
     do: List.to_string(line_text)

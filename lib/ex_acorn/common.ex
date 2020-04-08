@@ -132,6 +132,21 @@ defmodule ExAcorn.Common do
     |> ignore(close_curly())
   end
 
+  def bracket_group(children) when is_list(children) do
+    ignore(open_bracket())
+    |> optional(whitespace())
+    |> repeat(
+      lookahead_not(close_bracket())
+      |> choice(
+        children ++ [ignore(ascii_char([?,])), ascii_string([not: ?,, not: ?[, not: ?]], min: 1)]
+      )
+    )
+    |> wrap()
+    |> optional(whitespace())
+    |> ignore(close_bracket())
+    |> label("bracket_group")
+  end
+
   def local_block(inner_combinator \\ empty()) do
     ignore(open_curly())
     |> optional(whitespace())
@@ -145,23 +160,30 @@ defmodule ExAcorn.Common do
     |> label("local_block")
   end
 
-  def variable_statement do
+  def variable_statement(expression_combinator \\ empty()) do
+    declarations =
+      choice([
+        ignore(eq())
+        |> optional(whitespace())
+        |> repeat(lookahead_not(expression_boundary()) |> concat(expression_combinator))
+        |> concat(expression_boundary())
+        |> tag(:init),
+        ignore(expression_boundary())
+        |> tag(:init)
+      ])
+      |> tag(:variable_declaration)
+
     choice([string("let"), string("const"), string("var")])
+    |> unwrap_and_tag(:kind)
     |> ignore(whitespace())
     |> concat(
       line_text()
       |> concat(ascii_string([?\s, ?\t], min: 0) |> ignore() |> label("whitespace()"))
       |> repeat(ignore(comma() |> optional(whitespace())) |> concat(line_text()))
+      |> tag(:declaration_ids)
     )
     |> optional(space_chars())
-    |> choice([
-      ignore(eq())
-      |> optional(whitespace())
-      |> lookahead(non_whitespace_chars())
-      |> tag(:assignment),
-      expression_boundary()
-      |> tag(:no_assign)
-    ])
+    |> concat(declarations)
     |> tag(:variable)
   end
 end

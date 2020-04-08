@@ -11,7 +11,7 @@ defmodule ExAcorn.Statement.IfStatement do
         variable_statement(),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
-      |> tag(:test)
+      |> unwrap_and_tag(:test)
 
     ignore(string("if"))
     |> optional(whitespace())

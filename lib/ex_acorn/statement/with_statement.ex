@@ -13,7 +13,7 @@ defmodule ExAcorn.Statement.WithStatement do
         variable_statement(),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
-      |> tag(:condition)
+      |> unwrap_and_tag(:condition)
     )
     |> optional(space_chars())
     |> concat(local_block(root_statement))

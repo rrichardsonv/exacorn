@@ -11,7 +11,7 @@ defmodule ExAcorn.Statement.ForStatement do
         variable_statement(),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
-      |> tag(:condition)
+      |> unwrap_and_tag(:condition)
 
     ignore(string("for"))
     |> optional(space_chars())

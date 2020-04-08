@@ -55,10 +55,11 @@ defmodule ExAcorn.StatementTest do
     js = """
     var foo = -1;
     let res = 0;
+    const baz = [1,2,3]
     while (++foo < 10) { res + 2 }
 
     do {
-      console.log(res);
+      console.log(baz[res]);
       res = (function(x){x - 2})(res);
     } while(res>=0);
     """

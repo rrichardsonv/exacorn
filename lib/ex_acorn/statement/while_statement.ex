@@ -11,13 +11,13 @@ defmodule ExAcorn.Statement.WhileStatement do
         variable_statement(),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
-      |> tag(:condition)
+      |> unwrap_and_tag(:condition)
 
     ignore(string("while"))
     |> optional(space_chars())
     |> concat(condition)
     |> optional(space_chars())
-    |> concat(local_block(root_statement) |> tag(:block))
+    |> concat(local_block(root_statement) |> unwrap_and_tag(:block))
     |> tag(:while_statement)
   end
 

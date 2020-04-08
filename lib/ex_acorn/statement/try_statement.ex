@@ -11,7 +11,7 @@ defmodule ExAcorn.Statement.TryStatement do
         variable_statement(),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
-      |> tag(:expression)
+      |> unwrap_and_tag(:expression)
 
     catch_clause =
       ignore(string("catch"))
