@@ -41,7 +41,10 @@ defmodule ExAcorn.Common do
       double_quote()
       |> repeat(
         lookahead_not(double_quote())
-        |> concat(ascii_string([0..255, {:not, ?"}], min: 1))
+        |> choice([
+          string("\""),
+          ascii_string([0..255, {:not, ?"}], min: 1)
+        ])
       )
       |> concat(double_quote())
       |> optional(semi())
@@ -49,7 +52,10 @@ defmodule ExAcorn.Common do
       single_quote()
       |> repeat(
         lookahead_not(single_quote())
-        |> concat(ascii_string([0..255, {:not, ?'}], min: 1))
+        |> choice([
+          string("\'"),
+          ascii_string([0..255, {:not, ?'}], min: 1)
+        ])
       )
       |> concat(single_quote())
       |> optional(semi())
@@ -57,7 +63,10 @@ defmodule ExAcorn.Common do
       backtick_quote()
       |> repeat(
         lookahead_not(backtick_quote())
-        |> concat(ascii_string([0..255, {:not, ?`}], min: 1))
+        |> choice([
+          string("\`"),
+          ascii_string([0..255, {:not, ?`}], min: 1)
+        ])
       )
       |> concat(backtick_quote())
       |> optional(semi())
@@ -110,37 +119,50 @@ defmodule ExAcorn.Common do
     |> tag(:comment)
   end
 
-  def paren_group(children) do
+  def paren_group(children, traverse_mapper \\ {ExAcorn.Conflict, :base, []})
+      when is_list(children) do
     ignore(open_paren())
     |> repeat(
       lookahead_not(close_paren())
-      |> choice(children ++ [ascii_string([not: ?(, not: ?)], min: 1)])
+      |> choice(children ++ [non_control_char(), ascii_char(not: ?)) |> tag(:unknown)])
     )
+    |> post_traverse(traverse_mapper)
     |> wrap()
     |> optional(whitespace())
     |> ignore(close_paren())
   end
 
-  def curly_group(children) when is_list(children) do
+  def curly_group(children, traverse_mapper \\ {ExAcorn.Conflict, :noop, []})
+      when is_list(children) do
     ignore(open_curly())
     |> repeat(
       lookahead_not(close_curly())
-      |> choice(children ++ [ascii_string([not: ?{, not: ?}], min: 1)])
+      |> optional(whitespace())
+      |> choice(children ++ [non_control_char(), ascii_char(not: ?}) |> tag(:unknown)])
     )
+    |> post_traverse(traverse_mapper)
     |> wrap()
     |> optional(whitespace())
     |> ignore(close_curly())
   end
 
-  def bracket_group(children) when is_list(children) do
+  def bracket_group(children, traverse_mapper \\ {ExAcorn.Conflict, :noop, []})
+      when is_list(children) do
     ignore(open_bracket())
     |> optional(whitespace())
     |> repeat(
       lookahead_not(close_bracket())
+      |> optional(whitespace())
       |> choice(
-        children ++ [ignore(ascii_char([?,])), ascii_string([not: ?,, not: ?[, not: ?]], min: 1)]
+        children ++
+          [
+            ignore(ascii_char([?,])),
+            non_control_char(),
+            ascii_char(not: ?]) |> tag(:unknown)
+          ]
       )
     )
+    |> post_traverse(traverse_mapper)
     |> wrap()
     |> optional(whitespace())
     |> ignore(close_bracket())
@@ -152,38 +174,16 @@ defmodule ExAcorn.Common do
     |> optional(whitespace())
     |> repeat(
       lookahead_not(close_curly())
-      |> choice([inner_combinator, ascii_string([not: ?{, not: ?}], min: 1)])
+      |> optional(whitespace())
+      |> choice([
+        inner_combinator,
+        non_control_char(),
+        ascii_char(not: ?}) |> tag(:unknown)
+      ])
     )
     |> wrap()
     |> optional(whitespace())
     |> ignore(close_curly())
     |> label("local_block")
-  end
-
-  def variable_statement(expression_combinator \\ empty()) do
-    declarations =
-      choice([
-        ignore(eq())
-        |> optional(whitespace())
-        |> repeat(lookahead_not(expression_boundary()) |> concat(expression_combinator))
-        |> concat(expression_boundary())
-        |> tag(:init),
-        ignore(expression_boundary())
-        |> tag(:init)
-      ])
-      |> tag(:variable_declaration)
-
-    choice([string("let"), string("const"), string("var")])
-    |> unwrap_and_tag(:kind)
-    |> ignore(whitespace())
-    |> concat(
-      line_text()
-      |> concat(ascii_string([?\s, ?\t], min: 0) |> ignore() |> label("whitespace()"))
-      |> repeat(ignore(comma() |> optional(whitespace())) |> concat(line_text()))
-      |> tag(:declaration_ids)
-    )
-    |> optional(space_chars())
-    |> concat(declarations)
-    |> tag(:variable)
   end
 end

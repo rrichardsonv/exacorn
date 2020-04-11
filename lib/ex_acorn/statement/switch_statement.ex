@@ -3,10 +3,12 @@ defmodule ExAcorn.Statement.SwitchStatement do
   import ExAcorn.Common
   import ExAcorn.Utils
 
-  def switch_statement do
+  def switch_statement(expression \\ empty(), root_combinator \\ empty()) do
     case_kw = ignore(string("case")) |> label("switch - case")
     default_kw = ignore(string("default")) |> label("switch - default")
     case_begin = ignore(colon()) |> label("switch - colon")
+
+    discriminant = paren_group([expression]) |> unwrap_and_tag(:discriminant)
 
     # case without consequent
     empty_switch_case =
@@ -35,9 +37,7 @@ defmodule ExAcorn.Statement.SwitchStatement do
         )
         |> choice([
           ignore(space_chars()),
-          quoted_string(),
-          comment(),
-          ascii_string([not: ?\n, not: ?;], min: 1)
+          root_combinator
         ])
         |> concat(expression_boundary())
         |> optional(space_chars())
@@ -72,32 +72,10 @@ defmodule ExAcorn.Statement.SwitchStatement do
 
     ignore(string("switch"))
     |> optional(whitespace())
-    |> concat(
-      paren_group([
-        optional(whitespace()) |> concat(comment()),
-        optional(whitespace()) |> concat(quoted_string()),
-        variable_statement(),
-        ascii_string([not: ?(, not: ?)], min: 1)
-      ])
-      |> tag(:discriminant)
-    )
+    |> concat(discriminant)
     |> optional(whitespace())
-    |> concat(
-      ignore(open_curly())
-      |> optional(whitespace())
-      |> repeat(
-        lookahead_not(close_curly())
-        |> optional(space_chars())
-        |> choice([
-          switch_case,
-          empty_switch_case
-        ])
-        |> optional(whitespace())
-      )
-      |> tag(:cases)
-    )
-    |> optional(whitespace())
-    |> ignore(close_brace())
+    |> concat(curly_group([switch_case, empty_switch_case]))
+    |> tag(:cases)
     |> tag(:switch_statement)
   end
 end

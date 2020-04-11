@@ -3,20 +3,16 @@ defmodule ExAcorn.Statement.WithStatement do
   import ExAcorn.Common
   import ExAcorn.Utils
 
-  def with_statement(root_statement \\ empty()) do
+  def with_statement(expression \\ empty(), root_statement \\ empty()) do
+    condition =
+      paren_group([expression])
+      |> unwrap_and_tag(:condition)
+
     ignore(string("with"))
     |> optional(space_chars())
-    |> concat(
-      paren_group([
-        optional(whitespace()) |> concat(comment()),
-        optional(whitespace()) |> concat(quoted_string()),
-        variable_statement(),
-        ascii_string([not: ?(, not: ?)], min: 1)
-      ])
-      |> unwrap_and_tag(:condition)
-    )
+    |> concat(condition)
     |> optional(space_chars())
-    |> concat(local_block(root_statement))
+    |> concat(root_statement)
     |> tag(:with_statement)
   end
 end

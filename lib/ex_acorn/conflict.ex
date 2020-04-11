@@ -1,0 +1,27 @@
+defmodule ExAcorn.Conflict do
+  def noop(_, a, c, _, _), do: {a, c}
+
+  def base(_, a, c, _, _) when is_list(a) do
+    case Enum.reduce(a, {:normal, []}, &resolve_orphans/2) do
+      {:normal, acc} ->
+        {acc, c}
+
+      {leftover, acc} ->
+        {[leftover | acc], c}
+    end
+  end
+
+  def base(_, args, context, _, _), do: {args, context}
+
+  def resolve_orphans({:orphaned_member_expression, _} = orphaned_expr, {:normal, acc}) do
+    {orphaned_expr, acc}
+  end
+
+  def resolve_orphans(parent_expr, {{:orphaned_member_expression, child_expr}, acc}) do
+    IO.inspect(parent_expr, label: "PARENT------------------")
+    IO.inspect(child_expr, label: "CHILD------------------")
+    {:normal, [{:member_expression, [{:object, parent_expr} | child_expr]} | acc]}
+  end
+
+  def resolve_orphans(a, {:normal, acc}), do: {:normal, [a | acc]}
+end

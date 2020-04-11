@@ -2,6 +2,7 @@ defmodule ExAcorn.Statement do
   import NimbleParsec
   import ExAcorn.Utils
   import ExAcorn.Common
+  import ExAcorn.Operators
   import ExAcorn.Statement.SwitchStatement
   import ExAcorn.Statement.BreakStatement
   import ExAcorn.Statement.ContinueStatement
@@ -19,9 +20,14 @@ defmodule ExAcorn.Statement do
   import ExAcorn.Statement.ForStatement
   import ExAcorn.Statement.FunctionStatement
   import ExAcorn.Statement.BlockStatement
+  import ExAcorn.Statement.DeclarationStatement
+  import ExAcorn.Statement.EmptyStatement
 
   import ExAcorn.Expression.Function
   import ExAcorn.Expression.Array
+  import ExAcorn.Expression.Member
+  import ExAcorn.Expression.Object
+  import ExAcorn.Expression.New
 
   defcombinatorp(
     :_statement,
@@ -30,44 +36,83 @@ defmodule ExAcorn.Statement do
       optional(whitespace()) |> concat(class_statement(parsec(:_block))),
       optional(whitespace()) |> concat(continue_statement()),
       optional(whitespace()) |> concat(debugger_statement()),
-      optional(whitespace()) |> concat(for_statement(parsec(:_block))),
+      optional(whitespace()) |> concat(for_statement(parsec(:_expression), parsec(:_block))),
       optional(whitespace()) |> concat(function_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(if_statement(parsec(:_block))),
+      optional(whitespace()) |> concat(if_statement(parsec(:_expression), parsec(:_block))),
       optional(whitespace()) |> concat(return_statement()),
-      optional(whitespace()) |> concat(switch_statement()),
+      optional(whitespace()) |> concat(switch_statement(parsec(:_expression), parsec(:_base))),
+      optional(whitespace()) |> concat(variable_statement(parsec(:_expression))),
       optional(whitespace()) |> concat(throw_statement()),
       optional(whitespace()) |> concat(try_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(variable_statement(parsec(:_expression))),
-      optional(whitespace()) |> concat(while_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(do_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(with_statement(parsec(:_block))),
+      optional(whitespace()) |> concat(while_statement(parsec(:_expression), parsec(:_block))),
+      optional(whitespace()) |> concat(do_statement(parsec(:_expression), parsec(:_block))),
+      optional(whitespace()) |> concat(with_statement(parsec(:_expression), parsec(:_block))),
       optional(whitespace()) |> concat(block_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(label_statement())
+      optional(whitespace()) |> concat(label_statement()),
+      optional(whitespace()) |> concat(empty_statement())
     ])
   )
 
   defcombinatorp(
-    :_quotes_and_comments,
+    :_literal,
     choice([
+      optional(whitespace()) |> concat(regular_expression()),
       optional(whitespace()) |> concat(comment()),
-      optional(whitespace()) |> concat(quoted_string())
+      optional(whitespace()) |> concat(quoted_string()),
+      optional(whitespace()) |> concat(bool_or_null_literal()),
+      optional(whitespace()) |> concat(integer()) |> unwrap_and_tag(:integer),
+      optional(whitespace()) |> concat(float()) |> unwrap_and_tag(:float)
     ])
+    |> tag(:literal)
   )
 
   defcombinatorp(
     :_expression,
     choice([
-      optional(whitespace()) |> concat(integer()) |> unwrap_and_tag(:integer),
-      optional(whitespace()) |> concat(float()) |> unwrap_and_tag(:float),
-      optional(whitespace()) |> concat(function_expression()),
+      parsec(:_literal),
+      optional(whitespace()) |> concat(operator()),
+      optional(whitespace()) |> concat(function_expression(parsec(:_block))),
+      optional(whitespace()) |> concat(object_expression(parsec(:_literal))),
+      optional(whitespace()) |> concat(new_expression(parsec(:_expression))),
+      optional(whitespace())
+      |> concat(member_expression(parsec(:_expression))),
       optional(whitespace())
       |> concat(
         array_expression([
-          parsec(:_quotes_and_comments),
+          parsec(:_literal),
           parsec(:_expression)
         ])
-      )
+      ),
+      optional(whitespace()) |> concat(line_text() |> tag(:name) |> tag(:identifier))
     ])
+    |> optional(parsec(:_paramaterized))
+    |> post_traverse({:scoop_up_in, []})
+  )
+
+  defp scoop_up_in(
+         _rest,
+         [{:call_expression, call_bod}, {:orphaned_member_expression, _} = callee_expr],
+         context,
+         _line,
+         _offset
+       ) do
+    {[{:orphaned_member_call_expression, [{:callee, callee_expr} | call_bod]}], context}
+  end
+
+  defp scoop_up_in(_rest, [{:call_expression, call_bod}, callee_expr], context, _line, _offset) do
+    {[{:call_expression, [{:callee, callee_expr} | call_bod]}], context}
+  end
+
+  defp scoop_up_in(_, args, context, _, _), do: {args, context}
+
+  defcombinatorp(
+    :_paramaterized,
+    optional(whitespace())
+    |> concat(
+      paren_group([parsec(:_expression)])
+      |> tag(:arguments)
+    )
+    |> tag(:call_expression)
   )
 
   defcombinatorp(
@@ -89,42 +134,31 @@ defmodule ExAcorn.Statement do
   )
 
   defcombinatorp(
-    :_block,
-    local_block(
-      choice([
-        parsec(:_quotes_and_comments),
-        parsec(:_statement),
-        parsec(:_expression)
-      ])
-    )
+    :_base,
+    choice([
+      parsec(:_literal),
+      parsec(:_statement),
+      parsec(:_expression)
+    ])
   )
 
   defcombinatorp(
-    :statement,
-    optional(whitespace())
-    |> choice([
-      if_statement(),
-      break_statement(),
-      continue_statement(),
-      with_statement(),
-      switch_statement(),
-      return_statement(),
-      throw_statement(),
-      try_statement(),
-      while_statement(),
-      do_statement(),
-      for_statement(),
-      label_statement(),
-      debugger_statement(),
-      block_statement()
+    :_block,
+    curly_group([
+      parsec(:_literal),
+      parsec(:_statement),
+      parsec(:_expression)
     ])
-    |> label("statement")
   )
 
   root =
     choice([
-      parsec(:_quotes_and_comments),
-      export_statement(),
+      parsec(:_literal),
+      export_statement([
+        class_statement(parsec(:_block)),
+        function_statement(parsec(:_block)),
+        variable_statement(parsec(:_expression))
+      ]),
       import_meta_statement(),
       import_statement(),
       parsec(:_statement),

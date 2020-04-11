@@ -3,21 +3,16 @@ defmodule ExAcorn.Statement.ForStatement do
   import ExAcorn.Common
   import ExAcorn.Utils
 
-  def for_statement(root_statement \\ empty()) do
+  def for_statement(expression \\ empty(), root_statement \\ empty()) do
     condition =
-      paren_group([
-        optional(whitespace()) |> concat(comment()),
-        optional(whitespace()) |> concat(quoted_string()),
-        variable_statement(),
-        ascii_string([not: ?(, not: ?)], min: 1)
-      ])
+      paren_group([expression])
       |> unwrap_and_tag(:condition)
 
     ignore(string("for"))
     |> optional(space_chars())
     |> concat(condition)
     |> optional(space_chars())
-    |> concat(local_block(root_statement))
+    |> concat(root_statement)
     |> tag(:for_statement)
   end
 end

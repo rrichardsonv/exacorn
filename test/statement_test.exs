@@ -53,15 +53,20 @@ defmodule ExAcorn.StatementTest do
 
   test "while" do
     js = """
-    var foo = -1;
-    let res = 0;
-    const baz = [1,2,3]
-    while (++foo < 10) { res + 2 }
+
+    var foo = -1
+    let res = 0, bar = [1,2,3]
+
+    while (foo < 10) {
+      res + 2
+    }
 
     do {
       console.log(baz[res]);
-      res = (function(x){x - 2})(res);
-    } while(res>=0);
+      res = function(x){
+       x - 2
+      };
+    } while(res>=0)
     """
 
     assert :foo == S.parse(js)
@@ -159,5 +164,32 @@ defmodule ExAcorn.StatementTest do
     """
 
     assert :ok == S.parse(js1)
+  end
+
+  test "literal nonsense" do
+    js = """
+    var re = /[^@]+@[^@]+/g
+    const maybeEmails = [
+      "foo.bar@example.com",
+      "jojo@bizzaro.co.uk",
+      "\" \""@localhost,
+    ]
+
+    const requests =
+      maybeEmail.filter(me => re.test(me))
+                .map(em => {
+                  return fetch(process.env.API_URL + "/user", {email: em})
+                })
+
+    Promise.all(requests).then(users => {
+      return hydrate(users);
+    })
+    .catch((err) => {
+      console.error(err);
+      throw new RequestError(err);
+    })
+    """
+
+    assert :ok == S.parse(js)
   end
 end

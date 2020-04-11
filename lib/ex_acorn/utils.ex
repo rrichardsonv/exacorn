@@ -76,6 +76,15 @@ defmodule ExAcorn.Utils do
       |> reduce({__MODULE__, :mixed_binary_to_string, []})
       |> label("float")
 
+  def bool_or_null_literal,
+    do:
+      choice([
+        string("true") |> tag(:boolean),
+        string("false") |> tag(:boolean),
+        string("null") |> tag(:null)
+      ])
+      |> lookahead(ascii_char([?;, ?}, ?), ?], ?/, ?&, ?|, ?\s, ?\t, ?\n, ?\r]))
+
   defcombinatorp(
     :util_non_whitespace_chars,
     ascii_string([not: ?\s, not: ?\t, not: ?\n, not: ?\r], min: 1) |> label("non_whitespace")
@@ -93,11 +102,12 @@ defmodule ExAcorn.Utils do
 
   def expression_boundary,
     do:
-      choice([
-        ascii_char([?\n, ?\r]) |> ignore() |> label("eol"),
-        ascii_char([?;]) |> optional(ascii_char([?\n])) |> ignore() |> label("semi")
-      ])
-      |> ignore()
+      ignore(
+        choice([
+          ascii_char([?\n, ?\r]) |> ignore() |> label("eol"),
+          ascii_char([?;]) |> optional(ascii_char([?\n])) |> ignore() |> label("semi")
+        ])
+      )
       |> label("expression_boundary")
 
   defcombinatorp(:util_eq, ascii_char([?=]) |> tag(:eq))
@@ -126,6 +136,20 @@ defmodule ExAcorn.Utils do
           {:not, ??},
           {:not, ?.},
           {:not, ?=},
+          {:not, ?-},
+          {:not, ?+},
+          {:not, ?!},
+          {:not, ?~},
+          {:not, ?>},
+          {:not, ?<},
+          {:not, ?*},
+          {:not, ?/},
+          {:not, ?%},
+          {:not, ?^},
+          {:not, ?&},
+          {:not, ?|},
+          {:not, ?\s},
+          {:not, ?\t},
           {:not, ?\n},
           {:not, ?\r}
         ],
@@ -138,6 +162,23 @@ defmodule ExAcorn.Utils do
     |> optional(ascii_string([?$, ?_, ?a..?z, ?A..?Z, ?0..?9], min: 1))
     |> reduce({__MODULE__, :mixed_binary_to_string, []})
     |> label("line_text")
+  end
+
+  def regular_expression do
+    flags = ascii_string([?a..?z], min: 1) |> tag(:flags)
+
+    ignore(ascii_char([?/]))
+    |> repeat(
+      lookahead_not(ascii_char([?/]))
+      |> choice([
+        string("\/"),
+        ascii_string([not: ?\n, not: ?/], min: 1)
+      ])
+    )
+    |> tag(:pattern)
+    |> ignore(ascii_char([?/]))
+    |> optional(flags)
+    |> tag(:regexp)
   end
 
   def mixed_binary_to_string([char | _] = line_text) when is_binary(char),

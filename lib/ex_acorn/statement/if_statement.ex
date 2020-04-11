@@ -3,14 +3,9 @@ defmodule ExAcorn.Statement.IfStatement do
   import ExAcorn.Common
   import ExAcorn.Utils
 
-  def if_statement(root_statement \\ empty()) do
+  def if_statement(expression \\ empty(), root_statement \\ empty()) do
     test =
-      paren_group([
-        optional(whitespace()) |> concat(comment()),
-        optional(whitespace()) |> concat(quoted_string()),
-        variable_statement(),
-        ascii_string([not: ?(, not: ?)], min: 1)
-      ])
+      paren_group([expression])
       |> unwrap_and_tag(:test)
 
     ignore(string("if"))

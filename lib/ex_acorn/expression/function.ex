@@ -8,27 +8,24 @@ defmodule ExAcorn.Expression.Function do
 
     param =
       choice([
-        optional(gather_op) |> concat(line_text()) |> ignore(comma()) |> optional(whitespace()),
+        optional(gather_op)
+        |> concat(line_text())
+        |> optional(whitespace())
+        |> lookahead_not(comma()),
         ascii_string([0..255, {:not, ?)}], min: 1)
       ])
 
-    fn_params = paren_group([param]) |> tag(:params)
+    fn_params = paren_group([param]) |> unwrap_and_tag(:params)
 
     choice([
       ignore(string("function")) |> optional(space_chars()) |> concat(fn_params),
-      fn_params |> optional(space_chars()) |> concat(string("=>"))
+      fn_params |> optional(space_chars()) |> ignore(string("=>")),
+      line_text() |> tag(:param) |> ignore(space_chars()) |> ignore(string("=>"))
     ])
     |> optional(space_chars())
-    |> concat(local_block(root_combinator))
+    |> concat(empty() |> tag(:id))
+    |> concat(root_combinator |> tag(:body))
     |> optional(expression_boundary())
     |> tag(:function_expression)
-  end
-
-  def function_evocation(expression_combinator \\ empty()) do
-    line_text()
-    |> tag(:fn_name)
-    |> concat(paren_group([expression_combinator]))
-    |> optional(expression_boundary())
-    |> tag(:function_call)
   end
 end

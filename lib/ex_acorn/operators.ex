@@ -2,62 +2,49 @@ defmodule ExAcorn.Operators do
   import NimbleParsec
   import ExAcorn.Utils
 
-  def unary_operator,
+  def operator,
     do:
-      choice([
-        string("-"),
-        string("+"),
-        string("!"),
-        string("~"),
-        string("typeof"),
-        string("void"),
-        string("delete")
-      ])
-      |> tag(:unary_operator)
-
-  def binary_operator,
-    do:
-      lookahead(non_whitespace_chars())
-      |> optional(space_chars())
+      optional(space_chars())
       |> choice([
-        string("==="),
-        string("!=="),
-        string(">>>"),
-        string(">>"),
-        string(">"),
-        string("<<"),
-        string("<"),
-        string("<="),
-        string(">="),
-        string("*"),
-        string("/"),
-        string("%"),
-        string("|"),
-        string("^"),
-        string("+"),
-        string("-"),
-        string("&"),
-        string("in"),
-        string("instanceof")
+        string("===") |> tag(:binary_operator),
+        string("!==") |> tag(:binary_operator),
+        string(">>>") |> tag(:binary_operator),
+        string(">>>=") |> tag(:assignment_operator),
+        string("<<=") |> tag(:assignment_operator),
+        string(">>=") |> tag(:assignment_operator),
+        string(">>") |> tag(:binary_operator),
+        string("<<") |> tag(:binary_operator),
+        string("<=") |> tag(:binary_operator),
+        string(">=") |> tag(:binary_operator),
+        string("in") |> concat(whitespace()) |> tag(:binary_operator),
+        string("instanceof") |> concat(whitespace()) |> tag(:binary_operator),
+        string("typeof") |> concat(whitespace()) |> tag(:unary_operator),
+        string("void") |> concat(whitespace()) |> tag(:unary_operator),
+        string("delete") |> concat(whitespace()) |> tag(:unary_operator),
+        string("+=") |> tag(:assignment_operator),
+        string("-=") |> tag(:assignment_operator),
+        string("*=") |> tag(:assignment_operator),
+        string("/=") |> tag(:assignment_operator),
+        string("%=") |> tag(:assignment_operator),
+        string("|=") |> tag(:assignment_operator),
+        string("^=") |> tag(:assignment_operator),
+        string("&=") |> tag(:assignment_operator),
+        string("||") |> tag(:logical_operator),
+        string("&&") |> tag(:logical_operator),
+        string("--") |> tag(:update_operator),
+        string("++") |> tag(:update_operator),
+        string("-") |> tag(:unary_operator),
+        string(">") |> tag(:binary_operator),
+        string("<") |> tag(:binary_operator),
+        string("*") |> tag(:binary_operator),
+        string("/") |> tag(:binary_operator),
+        string("%") |> tag(:binary_operator),
+        string("|") |> tag(:binary_operator),
+        string("^") |> tag(:binary_operator),
+        string("&") |> tag(:binary_operator),
+        string("+") |> tag(:unary_operator),
+        string("!") |> tag(:unary_operator),
+        string("~") |> tag(:unary_operator),
+        string("=") |> tag(:assignment_operator)
       ])
-      |> tag(:binary_operator)
-
-  def assignment_operator do
-    lookahead(non_whitespace_chars())
-    |> optional(space_chars())
-    |> choice([
-      string("="),
-      string("+="),
-      string("-="),
-      string("*="),
-      string("/="),
-      string("%="),
-      string("<<="),
-      string(">>="),
-      string(">>>="),
-      string("|="),
-      string("^="),
-      string("&=")
-    ])
-  end
 end

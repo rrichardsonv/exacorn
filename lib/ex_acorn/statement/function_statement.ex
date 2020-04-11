@@ -22,7 +22,7 @@ defmodule ExAcorn.Statement.FunctionStatement do
       |> optional(space_chars())
       |> concat(fn_params)
       |> optional(space_chars())
-      |> concat(local_block(root_statement))
+      |> concat(root_statement)
 
     choice([
       ignore(async_decorator)
