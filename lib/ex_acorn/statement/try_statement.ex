@@ -10,7 +10,7 @@ defmodule ExAcorn.Statement.TryStatement do
         optional(whitespace()) |> concat(quoted_string()),
         ascii_string([not: ?(, not: ?)], min: 1)
       ])
-      |> unwrap_and_tag(:expression)
+      |> unwrap_and_tag(:param)
 
     catch_clause =
       ignore(string("catch"))
