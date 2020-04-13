@@ -31,59 +31,58 @@ defmodule ExAcorn.Statement do
 
   defcombinatorp(
     :_statement,
-    choice([
-      optional(whitespace()) |> concat(break_statement()),
-      optional(whitespace()) |> concat(class_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(continue_statement()),
-      optional(whitespace()) |> concat(debugger_statement()),
-      optional(whitespace()) |> concat(for_statement(parsec(:_expression), parsec(:_block))),
-      optional(whitespace()) |> concat(function_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(if_statement(parsec(:_expression), parsec(:_block))),
-      optional(whitespace()) |> concat(return_statement()),
-      optional(whitespace()) |> concat(switch_statement(parsec(:_expression), parsec(:_base))),
-      optional(whitespace()) |> concat(variable_statement(parsec(:_expression))),
-      optional(whitespace()) |> concat(throw_statement()),
-      optional(whitespace()) |> concat(try_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(while_statement(parsec(:_expression), parsec(:_block))),
-      optional(whitespace()) |> concat(do_statement(parsec(:_expression), parsec(:_block))),
-      optional(whitespace()) |> concat(with_statement(parsec(:_expression), parsec(:_block))),
-      optional(whitespace()) |> concat(block_statement(parsec(:_block))),
-      optional(whitespace()) |> concat(label_statement()),
-      optional(whitespace()) |> concat(empty_statement())
+    optional(whitespace())
+    |> choice([
+      break_statement(),
+      class_statement(parsec(:_block)),
+      continue_statement(),
+      debugger_statement(),
+      for_statement(parsec(:_expression), parsec(:_block)),
+      function_statement(parsec(:_block)),
+      if_statement(parsec(:_expression), parsec(:_block)),
+      return_statement(),
+      switch_statement(parsec(:_expression), parsec(:_base)),
+      variable_statement(parsec(:_expression)),
+      throw_statement(),
+      try_statement(parsec(:_block)),
+      while_statement(parsec(:_expression), parsec(:_block)),
+      do_statement(parsec(:_expression), parsec(:_block)),
+      with_statement(parsec(:_expression), parsec(:_block)),
+      block_statement(parsec(:_block)),
+      label_statement(),
+      empty_statement()
     ])
   )
 
   defcombinatorp(
     :_literal,
-    choice([
-      optional(whitespace()) |> concat(regular_expression()),
-      optional(whitespace()) |> concat(comment()),
-      optional(whitespace()) |> concat(quoted_string()),
-      optional(whitespace()) |> concat(bool_or_null_literal()),
-      optional(whitespace()) |> concat(integer()) |> unwrap_and_tag(:integer),
-      optional(whitespace()) |> concat(float()) |> unwrap_and_tag(:float)
+    optional(whitespace())
+    |> choice([
+      regular_expression(),
+      comment(),
+      quoted_string(),
+      bool_or_null_literal(),
+      integer() |> unwrap_and_tag(:integer),
+      float() |> unwrap_and_tag(:float)
     ])
     |> tag(:literal)
   )
 
   defcombinatorp(
     :_expression,
-    choice([
+    optional(whitespace())
+    |> choice([
       parsec(:_literal),
-      optional(whitespace()) |> concat(operator()),
-      optional(whitespace()) |> concat(function_expression(parsec(:_block))),
-      optional(whitespace()) |> concat(object_expression(parsec(:_literal))),
-      optional(whitespace()) |> concat(new_expression(parsec(:_expression))),
-      optional(whitespace())
-      |> concat(member_expression(parsec(:_expression))),
-      optional(whitespace())
-      |> concat(
-        array_expression([
-          parsec(:_literal),
-          parsec(:_expression)
-        ])
-      ),
-      optional(whitespace()) |> concat(line_text() |> tag(:name) |> tag(:identifier))
+      operator(),
+      function_expression(parsec(:_block)),
+      object_expression(parsec(:_literal)),
+      new_expression(parsec(:_expression)),
+      member_expression(parsec(:_expression)),
+      array_expression([
+        parsec(:_literal),
+        parsec(:_expression)
+      ]),
+      line_text() |> tag(:name) |> tag(:identifier)
     ])
     |> optional(parsec(:_paramaterized))
     |> post_traverse({:scoop_up_in, []})
