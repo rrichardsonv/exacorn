@@ -18,10 +18,10 @@ defmodule ExAcorn.Conflict do
   end
 
   def resolve_orphans(parent_expr, {{:orphaned_member_expression, child_expr}, acc}) do
-    IO.inspect(parent_expr, label: "PARENT------------------")
-    IO.inspect(child_expr, label: "CHILD------------------")
     {:normal, [{:member_expression, [{:object, parent_expr} | child_expr]} | acc]}
   end
 
   def resolve_orphans(a, {:normal, acc}), do: {:normal, [a | acc]}
+
+  def split_on_sequence(_, a, c, _, _), do: {a, c}
 end

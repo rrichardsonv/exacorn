@@ -40,8 +40,11 @@ defmodule ExAcorn.Statement do
       debugger_statement(),
       for_statement(parsec(:_expression), parsec(:_block)),
       function_statement(parsec(:_block)),
-      if_statement(parsec(:_expression), parsec(:_block)),
-      return_statement(),
+      if_statement(parsec(:_expression), parsec(:_base)),
+      return_statement([
+        parsec(:_literal),
+        parsec(:_expression)
+      ]),
       switch_statement(parsec(:_expression), parsec(:_base)),
       variable_statement(parsec(:_expression)),
       throw_statement(parsec(:_expression)),
@@ -53,6 +56,7 @@ defmodule ExAcorn.Statement do
       label_statement(),
       empty_statement()
     ])
+    |> byte_offset()
   )
 
   defcombinatorp(
@@ -100,7 +104,6 @@ defmodule ExAcorn.Statement do
   end
 
   defp scoop_up_in(_rest, [{:call_expression, call_bod}, callee_expr], context, _line, _offset) do
-    IO.inspect(callee_expr, label: "callee_expr")
     {[{:call_expression, [{:callee, callee_expr} | call_bod]}], context}
   end
 
@@ -157,10 +160,29 @@ defmodule ExAcorn.Statement do
       parsec(:_fallback)
     ])
 
+  defcombinatorp(
+    :src_start,
+    empty()
+    |> tag(:src_start)
+    |> line()
+    |> byte_offset()
+  )
+
+  defcombinatorp(
+    :src_end,
+    empty()
+    |> tag(:src_end)
+    |> line()
+    |> byte_offset()
+  )
+
   defparsec(
     :parse,
     optional(whitespace())
-    |> repeat(lookahead_not(eos()) |> concat(root))
+    |> repeat(
+      lookahead_not(eos())
+      |> concat(root)
+    )
     |> eos()
   )
 end

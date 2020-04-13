@@ -8,19 +8,24 @@ defmodule ExAcorn.Statement.IfStatement do
       paren_group([expression])
       |> unwrap_and_tag(:test)
 
+    alternate_clause =
+      choice([
+        ignore(string("else"))
+        |> optional(whitespace())
+        |> concat(curly_group([root_statement]))
+        |> tag(:alternate),
+        empty() |> tag(:alternate)
+      ])
+
     ignore(string("if"))
     |> optional(whitespace())
     |> concat(test)
     |> optional(whitespace())
-    |> concat(local_block(root_statement) |> tag(:consequent))
-    |> optional(whitespace())
     |> choice([
-      ignore(string("else"))
-      |> optional(whitespace())
-      |> concat(local_block(root_statement))
-      |> tag(:alternate),
-      empty() |> tag(:alternate)
+      curly_group([root_statement]) |> tag(:consequent) |> concat(alternate_clause),
+      root_statement |> tag(:consequent) |> concat(empty() |> tag(:alternate))
     ])
+    |> optional(whitespace())
     |> tag(:if_statement)
   end
 end

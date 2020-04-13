@@ -88,7 +88,6 @@ defmodule ExAcorn.Common do
       char, acc when is_binary(char) ->
         char <> acc
     end)
-    |> IO.inspect(label: "Fppppppp")
   end
 
   def mixed_bin_to_string(text), do: text

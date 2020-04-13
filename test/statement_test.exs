@@ -182,7 +182,9 @@ defmodule ExAcorn.StatementTest do
                 })
 
     Promise.all(requests).then(users => {
-      return hydrate(users);
+      if(!users.length) return null;
+
+      return hydrate(users, false);
     })
     .catch((err) => {
       console.error(err);

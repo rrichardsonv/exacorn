@@ -9,6 +9,7 @@ defmodule ExAcorn.Expression.Call do
         ignore(comma()) |> concat(expr),
         expr
       ])
+      |> post_traverse({ExAcorn.Conflict, :split_on_sequence, []})
       |> unwrap_and_tag(:arguments)
 
     args |> tag(:call_expression)

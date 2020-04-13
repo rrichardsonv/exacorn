@@ -8,7 +8,12 @@ defmodule ExAcorn.Utils do
   )
 
   def whitespace,
-    do: ascii_string([?\s, ?\t, ?\n, ?\r], min: 1) |> ignore() |> label("whitespace")
+    do:
+      ascii_string([?\s, ?\t, ?\n, ?\r], min: 1)
+      |> ignore()
+      |> line()
+      |> reduce({:to_src_loc, []})
+      |> label("whitespace")
 
   defcombinatorp(
     :util_space_chars,
@@ -18,7 +23,9 @@ defmodule ExAcorn.Utils do
   def space_chars, do: ascii_string([?\s, ?\t], min: 1) |> ignore() |> label("space_chars")
 
   defcombinatorp(:util_eol, ascii_char([?\n]) |> ignore() |> label("eol"))
-  def eol, do: ascii_char([?\n]) |> ignore() |> label("eol")
+
+  def eol,
+    do: ascii_char([?\n]) |> ignore() |> line() |> reduce({:to_src_loc, []}) |> label("eol")
 
   defcombinatorp(:util_semi, ascii_char([?;]) |> ignore() |> label("semi"))
   def semi, do: ascii_char([?;]) |> ignore() |> label("semi")
@@ -66,7 +73,7 @@ defmodule ExAcorn.Utils do
   def close_paren, do: ascii_char([?)]) |> ignore() |> label("close_paren")
 
   def integer,
-    do: ascii_string([?0..?9], min: 1) |> label("integer")
+    do: ascii_string([?0..?9], min: 1) |> reduce({:transform_to_literal, []})
 
   def float,
     do:
@@ -74,7 +81,7 @@ defmodule ExAcorn.Utils do
       |> concat(ascii_char([?.]))
       |> concat(ascii_string([?0..?9], min: 1))
       |> reduce({__MODULE__, :mixed_binary_to_string, []})
-      |> label("float")
+      |> reduce({:transform_to_literal, []})
 
   def bool_or_null_literal,
     do:
@@ -84,6 +91,7 @@ defmodule ExAcorn.Utils do
         string("null") |> tag(:null)
       ])
       |> lookahead(ascii_char([?;, ?}, ?), ?], ?/, ?&, ?|, ?\s, ?\t, ?\n, ?\r]))
+      |> reduce({:transform_to_literal, []})
 
   defcombinatorp(
     :util_non_whitespace_chars,
@@ -104,11 +112,23 @@ defmodule ExAcorn.Utils do
     do:
       ignore(
         choice([
-          ascii_char([?\n, ?\r]) |> ignore() |> label("eol"),
-          ascii_char([?;]) |> optional(ascii_char([?\n])) |> ignore() |> label("semi")
+          ascii_char([?\n, ?\r])
+          |> ignore()
+          |> line()
+          |> reduce({:to_src_loc, []})
+          |> label("eol"),
+          ascii_char([?;])
+          |> optional(ascii_char([?\n]))
+          |> ignore()
+          |> line()
+          |> reduce({:to_src_loc, []})
+          |> label("semi")
         ])
       )
       |> label("expression_boundary")
+
+  def to_src_loc({[], {line, offset}}), do: {:new_line, {line, offset}}
+  def to_src_loc([{[], {line, offset}}]), do: {:new_line, {line, offset}}
 
   defcombinatorp(:util_eq, ascii_char([?=]) |> tag(:eq))
   def eq, do: ascii_char([?=]) |> tag(:eq)
@@ -229,4 +249,12 @@ defmodule ExAcorn.Utils do
     do: {pre, optional(ignore(ascii_string([?\s, ?\t], min: 1)) |> label("space_chars"))}
 
   defp get_combinator(_, acc), do: acc
+
+  def transform_to_literal([{:null, ["null"]}]), do: nil
+  def transform_to_literal([{:boolean, ["false"]}]), do: false
+  def transform_to_literal([{:boolean, ["true"]}]), do: true
+
+  def transform_to_literal(a) do
+    IO.inspect(a, label: "TRANSFORM TO LITERAL-------------------")
+  end
 end
