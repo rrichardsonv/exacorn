@@ -1,6 +1,5 @@
 defmodule ExAcorn.Statement.ExportStatement do
   import NimbleParsec
-  import ExAcorn.Common
   import ExAcorn.Utils
 
   def export_statement(declaration_combinators \\ empty()) do

@@ -42,37 +42,56 @@ defmodule ExAcorn.Common do
       |> repeat(
         lookahead_not(double_quote())
         |> choice([
-          string("\""),
-          ascii_string([0..255, {:not, ?"}], min: 1)
+          ascii_char([?\\]) |> concat(ascii_char([?"])),
+          ascii_char([?\\]),
+          ascii_string([{:not, ?"}, {:not, ?\\}], min: 1)
         ])
       )
+      |> reduce({:mixed_bin_to_string, []})
       |> concat(double_quote())
       |> optional(semi())
-      |> tag(:quoted_string),
+      |> unwrap_and_tag(:quoted_string),
       single_quote()
       |> repeat(
         lookahead_not(single_quote())
         |> choice([
-          string("\'"),
-          ascii_string([0..255, {:not, ?'}], min: 1)
+          ascii_char([?\\]) |> concat(ascii_char([?'])),
+          ascii_char([?\\]),
+          ascii_string([{:not, ?'}, {:not, ?\\}], min: 1)
         ])
       )
+      |> reduce({:mixed_bin_to_string, []})
       |> concat(single_quote())
       |> optional(semi())
-      |> tag(:quoted_string),
+      |> unwrap_and_tag(:quoted_string),
       backtick_quote()
       |> repeat(
         lookahead_not(backtick_quote())
         |> choice([
-          string("\`"),
-          ascii_string([0..255, {:not, ?`}], min: 1)
+          ascii_char([?\\]) |> concat(ascii_char([?`])),
+          ascii_char([?\\]),
+          ascii_string([{:not, ?`}, {:not, ?\\}], min: 1)
         ])
       )
+      |> reduce({:mixed_bin_to_string, []})
       |> concat(backtick_quote())
       |> optional(semi())
       |> tag(:quoted_template)
     ])
   end
+
+  def mixed_bin_to_string(text) when is_list(text) do
+    Enum.reduce(text, "", fn
+      char, acc when is_integer(char) ->
+        List.to_string([char]) <> acc
+
+      char, acc when is_binary(char) ->
+        char <> acc
+    end)
+    |> IO.inspect(label: "Fppppppp")
+  end
+
+  def mixed_bin_to_string(text), do: text
 
   # ---------------------------
   # Comments

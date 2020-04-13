@@ -172,7 +172,7 @@ defmodule ExAcorn.StatementTest do
     const maybeEmails = [
       "foo.bar@example.com",
       "jojo@bizzaro.co.uk",
-      "\" \""@localhost,
+      '\\' \\'@localhost',
     ]
 
     const requests =
