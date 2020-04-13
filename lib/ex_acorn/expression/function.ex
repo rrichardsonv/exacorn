@@ -3,7 +3,7 @@ defmodule ExAcorn.Expression.Function do
   import ExAcorn.Utils
   import ExAcorn.Common
 
-  def function_expression(root_combinator \\ empty()) do
+  def function_expression(expr \\ empty(), root_combinator \\ empty()) do
     gather_op = string("...") |> lookahead(line_text()) |> label("gather")
 
     param =
@@ -15,16 +15,37 @@ defmodule ExAcorn.Expression.Function do
         ascii_string([0..255, {:not, ?)}], min: 1)
       ])
 
-    fn_params = paren_group([param]) |> unwrap_and_tag(:params)
+    fn_params =
+      choice([
+        ignore(string("function"))
+        |> optional(space_chars())
+        |> concat(paren_group([param]))
+        |> unwrap_and_tag(:params),
+        paren_group([param])
+        |> unwrap_and_tag(:params)
+        |> optional(space_chars())
+        |> ignore(string("=>"))
+      ])
+
+    single_arg_shorthand =
+      line_text()
+      |> tag(:param)
+      |> optional(space_chars())
+      |> ignore(string("=>"))
+      |> concat(empty() |> tag(:id))
+      |> optional(space_chars())
 
     choice([
-      ignore(string("function")) |> optional(space_chars()) |> concat(fn_params),
-      fn_params |> optional(space_chars()) |> ignore(string("=>")),
-      line_text() |> tag(:param) |> ignore(space_chars()) |> ignore(string("=>"))
+      fn_params
+      |> optional(space_chars())
+      |> concat(empty() |> tag(:id))
+      |> concat(root_combinator |> tag(:body)),
+      single_arg_shorthand
+      |> choice([
+        expr |> unwrap_and_tag(:body),
+        root_combinator |> unwrap_and_tag(:body)
+      ])
     ])
-    |> optional(space_chars())
-    |> concat(empty() |> tag(:id))
-    |> concat(root_combinator |> tag(:body))
     |> optional(expression_boundary())
     |> tag(:function_expression)
   end

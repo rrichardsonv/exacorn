@@ -28,6 +28,7 @@ defmodule ExAcorn.Statement do
   import ExAcorn.Expression.Member
   import ExAcorn.Expression.Object
   import ExAcorn.Expression.New
+  import ExAcorn.Expression.Call
 
   defcombinatorp(
     :_statement,
@@ -43,7 +44,7 @@ defmodule ExAcorn.Statement do
       return_statement(),
       switch_statement(parsec(:_expression), parsec(:_base)),
       variable_statement(parsec(:_expression)),
-      throw_statement(),
+      throw_statement(parsec(:_expression)),
       try_statement(parsec(:_block)),
       while_statement(parsec(:_expression), parsec(:_block)),
       do_statement(parsec(:_expression), parsec(:_block)),
@@ -73,8 +74,8 @@ defmodule ExAcorn.Statement do
     optional(whitespace())
     |> choice([
       parsec(:_literal),
+      function_expression(parsec(:_expression), parsec(:_block)),
       operator(),
-      function_expression(parsec(:_block)),
       object_expression(parsec(:_literal)),
       new_expression(parsec(:_expression)),
       member_expression(parsec(:_expression)),
@@ -82,9 +83,9 @@ defmodule ExAcorn.Statement do
         parsec(:_literal),
         parsec(:_expression)
       ]),
-      line_text() |> tag(:name) |> tag(:identifier)
+      line_text() |> unwrap_and_tag(:name) |> tag(:identifier)
     ])
-    |> optional(parsec(:_paramaterized))
+    |> optional(call_expression(parsec(:_expression)))
     |> post_traverse({:scoop_up_in, []})
   )
 
@@ -99,20 +100,11 @@ defmodule ExAcorn.Statement do
   end
 
   defp scoop_up_in(_rest, [{:call_expression, call_bod}, callee_expr], context, _line, _offset) do
+    IO.inspect(callee_expr, label: "callee_expr")
     {[{:call_expression, [{:callee, callee_expr} | call_bod]}], context}
   end
 
   defp scoop_up_in(_, args, context, _, _), do: {args, context}
-
-  defcombinatorp(
-    :_paramaterized,
-    optional(whitespace())
-    |> concat(
-      paren_group([parsec(:_expression)])
-      |> tag(:arguments)
-    )
-    |> tag(:call_expression)
-  )
 
   defcombinatorp(
     :_fallback,
@@ -162,13 +154,7 @@ defmodule ExAcorn.Statement do
       import_statement(),
       parsec(:_statement),
       parsec(:_expression),
-      parsec(:_fallback),
-      close_brace(),
-      open_brace(),
-      open_paren(),
-      close_paren(),
-      open_bracket(),
-      close_bracket()
+      parsec(:_fallback)
     ])
 
   defparsec(

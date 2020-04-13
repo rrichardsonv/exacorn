@@ -124,7 +124,14 @@ defmodule ExAcorn.Common do
     ignore(open_paren())
     |> repeat(
       lookahead_not(close_paren())
-      |> choice(children ++ [non_control_char(), ascii_char(not: ?)) |> tag(:unknown)])
+      |> repeat(
+        lookahead_not(ascii_char([?,, ?)]))
+        |> choice(children ++ [non_control_char(), ascii_char(not: ?)) |> tag(:unknown)])
+      )
+      |> choice([
+        ignore(comma()) |> optional(whitespace()) |> tag(:seq_delimiter),
+        empty()
+      ])
     )
     |> post_traverse(traverse_mapper)
     |> wrap()

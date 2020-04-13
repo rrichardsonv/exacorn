@@ -4,10 +4,10 @@ defmodule ExAcorn.Conflict do
   def base(_, a, c, _, _) when is_list(a) do
     case Enum.reduce(a, {:normal, []}, &resolve_orphans/2) do
       {:normal, acc} ->
-        {acc, c}
+        {Enum.reverse(acc), c}
 
       {leftover, acc} ->
-        {[leftover | acc], c}
+        {Enum.reverse([leftover | acc]), c}
     end
   end
 

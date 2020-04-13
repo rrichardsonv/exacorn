@@ -26,7 +26,7 @@ defmodule ExAcorn.Statement.DeclarationStatement do
     declaration_id =
       line_text()
       |> optional(space_chars())
-      |> tag(:id)
+      |> unwrap_and_tag(:id)
 
     declarations =
       repeat(
