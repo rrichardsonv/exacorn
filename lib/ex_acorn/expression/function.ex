@@ -42,8 +42,8 @@ defmodule ExAcorn.Expression.Function do
       |> concat(root_combinator |> tag(:body)),
       single_arg_shorthand
       |> choice([
-        expr |> unwrap_and_tag(:body),
-        root_combinator |> unwrap_and_tag(:body)
+        expr |> tag(:body),
+        root_combinator |> tag(:body)
       ])
     ])
     |> optional(expression_boundary())

@@ -11,8 +11,6 @@ defmodule ExAcorn.Utils do
     do:
       ascii_string([?\s, ?\t, ?\n, ?\r], min: 1)
       |> ignore()
-      |> line()
-      |> reduce({:to_src_loc, []})
       |> label("whitespace")
 
   defcombinatorp(
@@ -25,7 +23,7 @@ defmodule ExAcorn.Utils do
   defcombinatorp(:util_eol, ascii_char([?\n]) |> ignore() |> label("eol"))
 
   def eol,
-    do: ascii_char([?\n]) |> ignore() |> line() |> reduce({:to_src_loc, []}) |> label("eol")
+    do: ascii_char([?\n]) |> ignore() |> label("eol")
 
   defcombinatorp(:util_semi, ascii_char([?;]) |> ignore() |> label("semi"))
   def semi, do: ascii_char([?;]) |> ignore() |> label("semi")
@@ -114,14 +112,10 @@ defmodule ExAcorn.Utils do
         choice([
           ascii_char([?\n, ?\r])
           |> ignore()
-          |> line()
-          |> reduce({:to_src_loc, []})
           |> label("eol"),
           ascii_char([?;])
           |> optional(ascii_char([?\n]))
           |> ignore()
-          |> line()
-          |> reduce({:to_src_loc, []})
           |> label("semi")
         ])
       )
@@ -186,14 +180,16 @@ defmodule ExAcorn.Utils do
 
   def regular_expression do
     flags = ascii_string([?a..?z], min: 1) |> tag(:flags)
+    non_slash = choice([
+      string("\/"),
+      ascii_string([not: ?\n, not: ?/], min: 1)
+    ])
 
     ignore(ascii_char([?/]))
+    |> concat(non_slash)
     |> repeat(
       lookahead_not(ascii_char([?/]))
-      |> choice([
-        string("\/"),
-        ascii_string([not: ?\n, not: ?/], min: 1)
-      ])
+      |> concat(non_slash)
     )
     |> tag(:pattern)
     |> ignore(ascii_char([?/]))
@@ -250,9 +246,9 @@ defmodule ExAcorn.Utils do
 
   defp get_combinator(_, acc), do: acc
 
-  def transform_to_literal([{:null, ["null"]}]), do: nil
-  def transform_to_literal([{:boolean, ["false"]}]), do: false
-  def transform_to_literal([{:boolean, ["true"]}]), do: true
+  def transform_to_literal([{:null, ["null"]}]), do: {:val, nil}
+  def transform_to_literal([{:boolean, ["false"]}]), do: {:val, false}
+  def transform_to_literal([{:boolean, ["true"]}]), do: {:val, true}
 
   def transform_to_literal(a) do
     IO.inspect(a, label: "TRANSFORM TO LITERAL-------------------")

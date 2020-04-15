@@ -60,10 +60,16 @@ defmodule ExAcorn.Operators do
              :update_operator,
              :logical_operator
            ] ->
-        {k, String.to_atom(v)}
+        {k, [val: String.to_atom(v)]}
 
       a ->
         a
     end)
+    |> case do
+      [{_, _} = single_operator] ->
+        single_operator
+      a ->
+        IO.inspect(a, label: "invariant------to_atom_operator----------")
+    end
   end
 end

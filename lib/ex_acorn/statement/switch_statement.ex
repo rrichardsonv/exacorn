@@ -39,8 +39,6 @@ defmodule ExAcorn.Statement.SwitchStatement do
           ignore(space_chars()),
           root_combinator
         ])
-        |> concat(expression_boundary())
-        |> optional(space_chars())
       )
       |> tag(:consequent)
 
@@ -56,7 +54,7 @@ defmodule ExAcorn.Statement.SwitchStatement do
             optional(whitespace()) |> concat(comment()),
             lookahead_not(case_begin)
             |> choice([
-              ignore(eol()),
+              ignore(whitespace()),
               ascii_string([not: ?:, not: ?\n], min: 1)
             ])
           ])

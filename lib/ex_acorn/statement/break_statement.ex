@@ -8,7 +8,10 @@ defmodule ExAcorn.Statement.BreakStatement do
     |> optional(space_chars())
     |> optional(quoted_string())
     |> optional(space_chars())
-    |> optional(line_text())
+    |> choice([
+      empty() |> tag(:label),
+      line_text() |> tag(:label)
+    ])
     |> optional(space_chars())
     |> concat(expression_boundary())
     |> tag(:break_statement)

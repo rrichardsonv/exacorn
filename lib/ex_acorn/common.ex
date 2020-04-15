@@ -83,10 +83,10 @@ defmodule ExAcorn.Common do
   def mixed_bin_to_string(text) when is_list(text) do
     Enum.reduce(text, "", fn
       char, acc when is_integer(char) ->
-        List.to_string([char]) <> acc
+        acc <> List.to_string([char])
 
       char, acc when is_binary(char) ->
-        char <> acc
+        acc <> char
     end)
   end
 
@@ -121,8 +121,8 @@ defmodule ExAcorn.Common do
     choice([
       ignore(string("//"))
       |> optional(space_chars())
-      |> concat(ascii_string([0..255, {:not, ?\n}], min: 0))
-      |> lookahead(eol()),
+      |> concat(ascii_string([0..255, {:not, ?\n}], min: 1))
+      |> concat(eol()),
       ignore(string("/*"))
       |> optional(eol())
       |> repeat(

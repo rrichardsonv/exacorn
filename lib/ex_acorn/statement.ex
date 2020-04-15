@@ -32,66 +32,85 @@ defmodule ExAcorn.Statement do
 
   defcombinatorp(
     :_statement,
-    optional(whitespace())
-    |> choice([
+    choice([
       break_statement(),
       class_statement(parsec(:_block)),
       continue_statement(),
       debugger_statement(),
-      for_statement(parsec(:_expression), parsec(:_block)),
+      for_statement(parsec(:expression), parsec(:_block)),
       function_statement(parsec(:_block)),
-      if_statement(parsec(:_expression), parsec(:_base)),
+      if_statement(parsec(:expression), parsec(:_base)),
       return_statement([
-        parsec(:_literal),
-        parsec(:_expression)
+        parsec(:literal),
+        parsec(:expression)
       ]),
-      switch_statement(parsec(:_expression), parsec(:_base)),
-      variable_statement(parsec(:_expression)),
-      throw_statement(parsec(:_expression)),
+      switch_statement(parsec(:expression), parsec(:_base)),
+      variable_statement(parsec(:expression)),
+      throw_statement(parsec(:expression)),
       try_statement(parsec(:_block)),
-      while_statement(parsec(:_expression), parsec(:_block)),
-      do_statement(parsec(:_expression), parsec(:_block)),
-      with_statement(parsec(:_expression), parsec(:_block)),
+      while_statement(parsec(:expression), parsec(:_block)),
+      do_statement(parsec(:expression), parsec(:_block)),
+      with_statement(parsec(:expression), parsec(:_block)),
       block_statement(parsec(:_block)),
-      label_statement(),
+      label_statement(optional(comment()) |> optional(whitespace()) |> concat(parsec(:statement))),
       empty_statement()
     ])
-    |> byte_offset()
+    |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+    |> post_traverse({ExAcorn.Conflict, :end_length, []})
   )
+
+  defcombinatorp(:statement, optional(whitespace()) |> concat(parsec(:_statement)))
 
   defcombinatorp(
     :_literal,
-    optional(whitespace())
-    |> choice([
+    choice([
       regular_expression(),
-      comment(),
       quoted_string(),
       bool_or_null_literal(),
       integer() |> unwrap_and_tag(:integer),
       float() |> unwrap_and_tag(:float)
     ])
     |> tag(:literal)
+    |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+    |> post_traverse({ExAcorn.Conflict, :end_length, []})
+  )
+
+  defcombinatorp(:literal,
+    optional(whitespace())
+    |> choice([
+      comment()
+      |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+      |> post_traverse({ExAcorn.Conflict, :end_length, []}),
+      parsec(:_literal)
+    ])
   )
 
   defcombinatorp(
     :_expression,
-    optional(whitespace())
-    |> choice([
-      parsec(:_literal),
-      function_expression(parsec(:_expression), parsec(:_block)),
+    choice([
+      parsec(:literal),
+      function_expression(parsec(:expression), parsec(:_block)),
       operator(),
-      object_expression(parsec(:_literal)),
-      new_expression(parsec(:_expression)),
-      member_expression(parsec(:_expression)),
+      object_expression(parsec(:literal)),
+      new_expression(parsec(:expression)),
+      member_expression(parsec(:expression)),
       array_expression([
-        parsec(:_literal),
-        parsec(:_expression)
+        parsec(:literal),
+        parsec(:expression)
       ]),
       line_text() |> unwrap_and_tag(:name) |> tag(:identifier)
     ])
-    |> optional(call_expression(parsec(:_expression)))
+    |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+    |> post_traverse({ExAcorn.Conflict, :end_length, []})
+    |> optional(
+      call_expression(parsec(:expression))
+      |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+      |> post_traverse({ExAcorn.Conflict, :end_length, []})
+    )
     |> post_traverse({:scoop_up_in, []})
   )
+
+  defcombinatorp(:expression, optional(whitespace()) |> concat(parsec(:_expression)))
 
   defp scoop_up_in(
          _rest,
@@ -130,51 +149,35 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :_base,
     choice([
-      parsec(:_literal),
-      parsec(:_statement),
-      parsec(:_expression)
+      parsec(:literal),
+      parsec(:statement),
+      parsec(:expression)
     ])
   )
 
   defcombinatorp(
     :_block,
     curly_group([
-      parsec(:_literal),
-      parsec(:_statement),
-      parsec(:_expression)
+      parsec(:literal),
+      parsec(:statement),
+      parsec(:expression)
     ])
   )
 
   root =
     choice([
-      parsec(:_literal),
+      parsec(:literal),
       export_statement([
         class_statement(parsec(:_block)),
         function_statement(parsec(:_block)),
-        variable_statement(parsec(:_expression))
+        variable_statement(parsec(:expression))
       ]),
       import_meta_statement(),
       import_statement(),
-      parsec(:_statement),
-      parsec(:_expression),
+      parsec(:statement),
+      parsec(:expression),
       parsec(:_fallback)
     ])
-
-  defcombinatorp(
-    :src_start,
-    empty()
-    |> tag(:src_start)
-    |> line()
-    |> byte_offset()
-  )
-
-  defcombinatorp(
-    :src_end,
-    empty()
-    |> tag(:src_end)
-    |> line()
-    |> byte_offset()
-  )
 
   defparsec(
     :parse,

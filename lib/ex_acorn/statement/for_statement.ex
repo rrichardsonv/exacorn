@@ -12,7 +12,7 @@ defmodule ExAcorn.Statement.ForStatement do
     |> optional(space_chars())
     |> concat(condition)
     |> optional(space_chars())
-    |> concat(root_statement)
+    |> concat(root_statement |> tag(:body))
     |> tag(:for_statement)
   end
 end

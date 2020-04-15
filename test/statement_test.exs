@@ -112,7 +112,7 @@ defmodule ExAcorn.StatementTest do
     'Papayas' /*
         I dunno some shit
         New {:} who dis
-      */:console.log('Mangoes and papayas are $2.79 a pound.');// expected output: "Mangoes and papayas are $2.79 a pound."
+      */:console.log('Mangoes and papayas are $2.79 a pound.'); // expected output: "Mangoes and papayas are $2.79 a pound."
     break;
     }
     """
@@ -172,7 +172,6 @@ defmodule ExAcorn.StatementTest do
     const maybeEmails = [
       "foo.bar@example.com",
       "jojo@bizzaro.co.uk",
-      '\\' \\'@localhost',
     ]
 
     const requests =
