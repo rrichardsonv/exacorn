@@ -18,9 +18,6 @@ defmodule ExAcorn.Operators do
         string(">=") |> tag(:binary_operator),
         string("in") |> ignore(whitespace()) |> tag(:binary_operator),
         string("instanceof") |> ignore(whitespace()) |> tag(:binary_operator),
-        string("typeof") |> ignore(whitespace()) |> tag(:unary_operator),
-        string("void") |> ignore(whitespace()) |> tag(:unary_operator),
-        string("delete") |> ignore(whitespace()) |> tag(:unary_operator),
         string("+=") |> tag(:assignment_operator),
         string("-=") |> tag(:assignment_operator),
         string("*=") |> tag(:assignment_operator),
@@ -33,7 +30,7 @@ defmodule ExAcorn.Operators do
         string("&&") |> tag(:logical_operator),
         string("--") |> tag(:update_operator),
         string("++") |> tag(:update_operator),
-        string("-") |> tag(:maybe_unary_operator),
+        string("-") |> tag(:binary_operator),
         string(">") |> tag(:binary_operator),
         string("<") |> tag(:binary_operator),
         string("*") |> tag(:binary_operator),
@@ -42,9 +39,7 @@ defmodule ExAcorn.Operators do
         string("|") |> tag(:binary_operator),
         string("^") |> tag(:binary_operator),
         string("&") |> tag(:binary_operator),
-        string("+") |> tag(:maybe_unary_operator),
-        string("!") |> tag(:unary_operator),
-        string("~") |> tag(:unary_operator),
+        string("+") |> tag(:binary_operator),
         string("=") |> tag(:assignment_operator)
       ])
       |> reduce({:to_atom_operator, []})

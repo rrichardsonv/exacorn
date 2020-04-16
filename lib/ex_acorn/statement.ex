@@ -29,6 +29,8 @@ defmodule ExAcorn.Statement do
   import ExAcorn.Expression.Object
   import ExAcorn.Expression.New
   import ExAcorn.Expression.Call
+  import ExAcorn.Expression.Conditional
+  import ExAcorn.Expression.Unary
 
   defcombinatorp(
     :_statement,
@@ -38,7 +40,7 @@ defmodule ExAcorn.Statement do
       continue_statement(),
       debugger_statement(),
       for_statement(parsec(:expression), parsec(:_block)),
-      function_statement(parsec(:_block)),
+      function_statement(parsec(:pattern), parsec(:_block)),
       if_statement(parsec(:expression), parsec(:_base)),
       return_statement([
         parsec(:literal),
@@ -60,6 +62,9 @@ defmodule ExAcorn.Statement do
   )
 
   defcombinatorp(:statement, optional(whitespace()) |> concat(parsec(:_statement)))
+
+  defcombinatorp(:_pattern, line_text() |> unwrap_and_tag(:name) |> tag(:identifier))
+  defcombinatorp(:pattern, optional(whitespace()) |> concat(parsec(:_pattern)))
 
   defcombinatorp(
     :_literal,
@@ -88,6 +93,7 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :_expression,
     choice([
+      unary_expression(parsec(:expression)),
       parsec(:literal),
       function_expression(parsec(:expression), parsec(:_block)),
       operator(),
@@ -98,7 +104,7 @@ defmodule ExAcorn.Statement do
         parsec(:literal),
         parsec(:expression)
       ]),
-      line_text() |> unwrap_and_tag(:name) |> tag(:identifier)
+      parsec(:pattern)
     ])
     |> pre_traverse({ExAcorn.Conflict, :start_length, []})
     |> post_traverse({ExAcorn.Conflict, :end_length, []})
@@ -108,25 +114,38 @@ defmodule ExAcorn.Statement do
       |> post_traverse({ExAcorn.Conflict, :end_length, []})
     )
     |> post_traverse({:scoop_up_in, []})
+    |> optional(
+      dangling_conditional(parsec(:expression))
+      |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+      |> post_traverse({ExAcorn.Conflict, :end_length, []})
+    )
+    |> post_traverse({:fix_dat_dangle, []})
   )
 
   defcombinatorp(:expression, optional(whitespace()) |> concat(parsec(:_expression)))
 
   defp scoop_up_in(
          _rest,
-         [{:call_expression, call_bod}, {:orphaned_member_expression, _} = callee_expr],
+         [{:call_expression, call_bod} | [{:orphaned_member_expression, _} = callee_expr | rest]],
          context,
          _line,
          _offset
        ) do
-    {[{:orphaned_member_call_expression, [{:callee, callee_expr} | call_bod]}], context}
+    {[{:orphaned_member_call_expression, [callee_expr | call_bod]} | rest], context}
   end
 
-  defp scoop_up_in(_rest, [{:call_expression, call_bod}, callee_expr], context, _line, _offset) do
-    {[{:call_expression, [{:callee, callee_expr} | call_bod]}], context}
+  defp scoop_up_in(_rest, [{:call_expression, call_bod} | [prev | rest]], context, _, _) do
+    {[{:call_expression, [{:callee, prev} | call_bod]} | rest], context}
   end
 
   defp scoop_up_in(_, args, context, _, _), do: {args, context}
+
+
+  defp fix_dat_dangle(_, [{:dangling_conditional, conditional} | [prev | rest]], context, _, _) do
+    {[{:conditional_expression, [{:test, prev} | conditional]} | rest], context}
+  end
+
+  defp fix_dat_dangle(_, args, context, _, _), do: {args, context}
 
   defcombinatorp(
     :_fallback,

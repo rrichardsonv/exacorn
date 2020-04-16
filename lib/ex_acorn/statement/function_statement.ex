@@ -3,18 +3,21 @@ defmodule ExAcorn.Statement.FunctionStatement do
   import ExAcorn.Common
   import ExAcorn.Utils
 
-  def function_statement(root_statement \\ empty()) do
+  def function_statement(pattern \\ empty(), root_statement \\ empty()) do
     gather_op = string("...") |> lookahead(line_text()) |> label("gather")
     async_decorator = string("async") |> concat(whitespace()) |> label("async")
 
     param =
       choice([
-        optional(gather_op) |> concat(line_text()) |> ignore(comma()) |> optional(whitespace()),
-        ascii_string([0..255, {:not, ?)}], min: 1)
+        optional(gather_op)
+        |> concat(pattern)
+        |> optional(comma())
+        |> optional(whitespace()),
+        ascii_string([0..255, {:not, ?)}], min: 1) |> tag(:unknown)
       ])
 
-    fn_params = paren_group([param]) |> tag(:params)
-    fn_name = line_text() |> tag(:name)
+    fn_params = paren_group([param]) |> unwrap_and_tag(:params)
+    fn_name = line_text() |> unwrap_and_tag(:name)
 
     fn_declaration =
       space_chars()
@@ -22,7 +25,7 @@ defmodule ExAcorn.Statement.FunctionStatement do
       |> optional(space_chars())
       |> concat(fn_params)
       |> optional(space_chars())
-      |> concat(root_statement)
+      |> concat(root_statement |> tag(:body))
 
     choice([
       ignore(async_decorator)

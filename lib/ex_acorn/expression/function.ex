@@ -28,7 +28,10 @@ defmodule ExAcorn.Expression.Function do
       ])
 
     single_arg_shorthand =
-      line_text()
+      choice([
+        line_text(),
+        ignore(open_paren()) |> ignore(close_paren())
+      ])
       |> tag(:param)
       |> optional(space_chars())
       |> ignore(string("=>"))
@@ -42,7 +45,10 @@ defmodule ExAcorn.Expression.Function do
       |> concat(root_combinator |> tag(:body)),
       single_arg_shorthand
       |> choice([
-        expr |> tag(:body),
+        expr
+        |> tag(:argument)
+        |> tag(:return_statement)
+        |> tag(:body),
         root_combinator |> tag(:body)
       ])
     ])

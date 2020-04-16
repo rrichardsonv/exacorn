@@ -193,4 +193,19 @@ defmodule ExAcorn.StatementTest do
 
     assert :ok == S.parse(js)
   end
+
+  test "ternary" do
+    js = """
+    var foo = true;
+    const bar = foo ? false : true
+    let z = () => bar ? foo : !bar
+
+    function y (x) {
+      return x() ? "y" : "z"
+    }
+
+    y(z)
+    """
+    assert :ok == S.parse(js)
+  end
 end
