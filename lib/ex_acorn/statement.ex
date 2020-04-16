@@ -31,6 +31,7 @@ defmodule ExAcorn.Statement do
   import ExAcorn.Expression.Call
   import ExAcorn.Expression.Conditional
   import ExAcorn.Expression.Unary
+  import ExAcorn.Expression.Binary
 
   defcombinatorp(
     :_statement,
@@ -114,11 +115,15 @@ defmodule ExAcorn.Statement do
       |> post_traverse({ExAcorn.Conflict, :end_length, []})
     )
     |> post_traverse({:scoop_up_in, []})
-    |> optional(
-      dangling_conditional(parsec(:expression))
-      |> pre_traverse({ExAcorn.Conflict, :start_length, []})
-      |> post_traverse({ExAcorn.Conflict, :end_length, []})
-    )
+    |> choice([
+        dangling_binary(parsec(:expression))
+        |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+        |> post_traverse({ExAcorn.Conflict, :end_length, []}),
+        dangling_conditional(parsec(:expression))
+        |> pre_traverse({ExAcorn.Conflict, :start_length, []})
+        |> post_traverse({ExAcorn.Conflict, :end_length, []}),
+        empty()
+    ])
     |> post_traverse({:fix_dat_dangle, []})
   )
 
@@ -143,6 +148,10 @@ defmodule ExAcorn.Statement do
 
   defp fix_dat_dangle(_, [{:dangling_conditional, conditional} | [prev | rest]], context, _, _) do
     {[{:conditional_expression, [{:test, prev} | conditional]} | rest], context}
+  end
+
+  defp fix_dat_dangle(_, [{:dangling_binary, conditional} | [prev | rest]], context, _, _) do
+    {[{:binary_expression, [{:left, prev} | conditional]} | rest], context}
   end
 
   defp fix_dat_dangle(_, args, context, _, _), do: {args, context}

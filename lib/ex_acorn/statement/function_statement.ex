@@ -11,7 +11,7 @@ defmodule ExAcorn.Statement.FunctionStatement do
       choice([
         optional(gather_op)
         |> concat(pattern)
-        |> optional(comma())
+        |> optional(ignore(comma()))
         |> optional(whitespace()),
         ascii_string([0..255, {:not, ?)}], min: 1) |> tag(:unknown)
       ])
