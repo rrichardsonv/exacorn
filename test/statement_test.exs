@@ -208,4 +208,14 @@ defmodule ExAcorn.StatementTest do
     """
     assert :ok == S.parse(js)
   end
+
+
+  test "operator precedence" do
+    js = """
+    var a = 2 - 2 * 3
+    var b = 3 * 2 - 2
+    """
+
+    assert :ok == S.parse(js)
+  end
 end
