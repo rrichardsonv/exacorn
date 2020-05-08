@@ -82,10 +82,12 @@ defmodule ExAcorn.ShuntOnEm do
                     acc ++ [entry]
             end)
 
-        {token_key, add_children(token_props, children)}
+        add_children(token_key, token_props, children)
     end
 
-    defp add_children(props, [right, left]), do: props ++ [right: right, left: left]
+    defp add_children(:maybe_binary_expression, props, [right]), do: {:unary_expression, props ++ [right: right]}
+    defp add_children(:maybe_binary_expression, props, [right, left]), do: {:binary_expression, props ++ [right: right, left: left]}
+    defp add_children(key, props, [right, left]), do: {key, props ++ [right: right, left: left]}
 
     @spec parse_impl([token()], [token()], [token()]) :: {[token()], [token()], [token()]}
     def parse_impl([], output_queue, stack), do: {[], output_queue, stack}

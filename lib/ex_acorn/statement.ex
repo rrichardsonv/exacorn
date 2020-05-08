@@ -29,9 +29,6 @@ defmodule ExAcorn.Statement do
   import ExAcorn.Expression.Object
   import ExAcorn.Expression.New
   import ExAcorn.Expression.Call
-  import ExAcorn.Expression.Conditional
-  import ExAcorn.Expression.Unary
-  import ExAcorn.Expression.Binary
 
   defcombinatorp(
     :_statement,
@@ -99,7 +96,10 @@ defmodule ExAcorn.Statement do
       object_expression(parsec(:literal)),
       new_expression(parsec(:expression)),
       member_expression(parsec(:expression)),
-      array_expression([parsec(:expressable)]),
+      array_expression([
+        parsec(:literal),
+        parsec(:expression)
+      ]),
       parsec(:pattern)
     ])
     |> pre_traverse({ExAcorn.Conflict, :start_length, []})
@@ -115,10 +115,11 @@ defmodule ExAcorn.Statement do
   defcombinatorp(:expression, optional(whitespace()) |> concat(parsec(:_expression)))
   defcombinatorp(:expressable,
     repeat_while(
-      choice([
-        parsec(:expression),
+      ignore(space_chars())
+      |> choice([
         parsec(:literal),
-        operator()
+        operator(),
+        parsec(:expression)
       ])
       |> post_traverse({:notch_status, []}),
       {__MODULE__, :check_notch, []}
@@ -192,6 +193,7 @@ defmodule ExAcorn.Statement do
       parsec(:expressable),
       parsec(:_fallback)
     ])
+    |> optional(whitespace())
 
   defparsec(
     :parse,
@@ -203,8 +205,8 @@ defmodule ExAcorn.Statement do
     |> eos()
   )
 
-  def resolve_precedence_tree(_, args, _context, _, _) do
-    {ExAcorn.ShuntOnEm.parse(args), %{}}
+  def resolve_precedence_tree(_, args, context, _, _) do
+    {ExAcorn.ShuntOnEm.parse(args), Map.delete(context, :last_notch?)}
   end
 
 

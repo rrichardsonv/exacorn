@@ -34,7 +34,7 @@ defmodule ExAcorn.Operators do
     {:in, 12, :left, :binary_expression},
     {:instanceof, 12, :left, :binary_expression},
     {:"=", 3, :left, :binary_expression},
-    {:"-", 14, :left, :binary_expression},
+    {:"-", 14, :left, :maybe_binary_expression},
     {:">", 12, :left, :binary_expression},
     {:"<", 12, :left, :binary_expression},
     {:"*", 15, :left, :binary_expression},
