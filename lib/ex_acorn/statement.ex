@@ -40,20 +40,20 @@ defmodule ExAcorn.Statement do
       class_statement(parsec(:_block)),
       continue_statement(),
       debugger_statement(),
-      for_statement(parsec(:expression), parsec(:_block)),
+      for_statement(parsec(:expressable), parsec(:_block)),
       function_statement(parsec(:pattern), parsec(:_block)),
-      if_statement(parsec(:expression), parsec(:_base)),
+      if_statement(parsec(:expressable), parsec(:_base)),
       return_statement([
         parsec(:literal),
-        parsec(:expression)
+        parsec(:expressable)
       ]),
-      switch_statement(parsec(:expression), parsec(:_base)),
-      variable_statement(parsec(:expression)),
-      throw_statement(parsec(:expression)),
+      switch_statement(parsec(:expressable), parsec(:_base)),
+      variable_statement(parsec(:expressable)),
+      throw_statement(parsec(:expressable)),
       try_statement(parsec(:_block)),
-      while_statement(parsec(:expression), parsec(:_block)),
-      do_statement(parsec(:expression), parsec(:_block)),
-      with_statement(parsec(:expression), parsec(:_block)),
+      while_statement(parsec(:expressable), parsec(:_block)),
+      do_statement(parsec(:expressable), parsec(:_block)),
+      with_statement(parsec(:expressable), parsec(:_block)),
       block_statement(parsec(:_block)),
       label_statement(optional(comment()) |> optional(whitespace()) |> concat(parsec(:statement))),
       empty_statement()
@@ -94,17 +94,12 @@ defmodule ExAcorn.Statement do
   defcombinatorp(
     :_expression,
     choice([
-      unary_expression(parsec(:expression)),
-      parsec(:literal),
       function_expression(parsec(:expression), parsec(:_block)),
       operator(),
       object_expression(parsec(:literal)),
       new_expression(parsec(:expression)),
       member_expression(parsec(:expression)),
-      array_expression([
-        parsec(:literal),
-        parsec(:expression)
-      ]),
+      array_expression([parsec(:expressable)]),
       parsec(:pattern)
     ])
     |> pre_traverse({ExAcorn.Conflict, :start_length, []})
@@ -115,19 +110,21 @@ defmodule ExAcorn.Statement do
       |> post_traverse({ExAcorn.Conflict, :end_length, []})
     )
     |> post_traverse({:scoop_up_in, []})
-    |> choice([
-        dangling_binary(parsec(:expression))
-        |> pre_traverse({ExAcorn.Conflict, :start_length, []})
-        |> post_traverse({ExAcorn.Conflict, :end_length, []}),
-        dangling_conditional(parsec(:expression))
-        |> pre_traverse({ExAcorn.Conflict, :start_length, []})
-        |> post_traverse({ExAcorn.Conflict, :end_length, []}),
-        empty()
-    ])
-    |> post_traverse({:fix_dat_dangle, []})
   )
 
   defcombinatorp(:expression, optional(whitespace()) |> concat(parsec(:_expression)))
+  defcombinatorp(:expressable,
+    repeat_while(
+      choice([
+        parsec(:expression),
+        parsec(:literal),
+        operator()
+      ])
+      |> post_traverse({:notch_status, []}),
+      {__MODULE__, :check_notch, []}
+    )
+    |> post_traverse({__MODULE__, :resolve_precedence_tree, []})
+  )
 
   defp scoop_up_in(
          _rest,
@@ -144,17 +141,6 @@ defmodule ExAcorn.Statement do
   end
 
   defp scoop_up_in(_, args, context, _, _), do: {args, context}
-
-
-  defp fix_dat_dangle(_, [{:dangling_conditional, conditional} | [prev | rest]], context, _, _) do
-    {[{:conditional_expression, [{:test, prev} | conditional]} | rest], context}
-  end
-
-  defp fix_dat_dangle(_, [{:dangling_binary, conditional} | [prev | rest]], context, _, _) do
-    {[{:binary_expression, [{:left, prev} | conditional]} | rest], context}
-  end
-
-  defp fix_dat_dangle(_, args, context, _, _), do: {args, context}
 
   defcombinatorp(
     :_fallback,
@@ -179,7 +165,7 @@ defmodule ExAcorn.Statement do
     choice([
       parsec(:literal),
       parsec(:statement),
-      parsec(:expression)
+      parsec(:expressable)
     ])
   )
 
@@ -188,7 +174,7 @@ defmodule ExAcorn.Statement do
     curly_group([
       parsec(:literal),
       parsec(:statement),
-      parsec(:expression)
+      parsec(:expressable)
     ])
   )
 
@@ -198,12 +184,12 @@ defmodule ExAcorn.Statement do
       export_statement([
         class_statement(parsec(:_block)),
         function_statement(parsec(:_block)),
-        variable_statement(parsec(:expression))
+        variable_statement(parsec(:expressable))
       ]),
       import_meta_statement(),
       import_statement(),
       parsec(:statement),
-      parsec(:expression),
+      parsec(:expressable),
       parsec(:_fallback)
     ])
 
@@ -216,4 +202,24 @@ defmodule ExAcorn.Statement do
     )
     |> eos()
   )
+
+  def resolve_precedence_tree(_, args, _context, _, _) do
+    {ExAcorn.ShuntOnEm.parse(args), %{}}
+  end
+
+
+  def notch_status(<<?;, _::binary>>, [{token, _}] = args, _context, _, _) when token != :opp,
+        do: {args, %{last_notch?: true}}
+  def notch_status(<<?\n, _::binary>>, [{token, _}] = args, _context, _, _) when token != :opp,
+    do: {args, %{last_notch?: true}}
+
+  def notch_status(_, args, context, _, _), do: {args, context}
+
+  def check_notch(_args, context, _, _) do
+    if Map.get(context, :last_notch?) do
+      {:halt, context}
+    else
+      {:cont, context}
+    end
+  end
 end

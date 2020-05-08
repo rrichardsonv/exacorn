@@ -2,69 +2,59 @@ defmodule ExAcorn.Operators do
   import NimbleParsec
   import ExAcorn.Utils
 
-  def operator,
-    do:
-      optional(space_chars())
-      |> choice([
-        string("===") |> tag(:binary_operator),
-        string("!==") |> tag(:binary_operator),
-        string(">>>") |> tag(:binary_operator),
-        string(">>>=") |> tag(:assignment_operator),
-        string("<<=") |> tag(:assignment_operator),
-        string(">>=") |> tag(:assignment_operator),
-        string(">>") |> tag(:binary_operator),
-        string("<<") |> tag(:binary_operator),
-        string("<=") |> tag(:binary_operator),
-        string(">=") |> tag(:binary_operator),
-        string("in") |> ignore(whitespace()) |> tag(:binary_operator),
-        string("instanceof") |> ignore(whitespace()) |> tag(:binary_operator),
-        string("+=") |> tag(:assignment_operator),
-        string("-=") |> tag(:assignment_operator),
-        string("*=") |> tag(:assignment_operator),
-        string("/=") |> tag(:assignment_operator),
-        string("%=") |> tag(:assignment_operator),
-        string("|=") |> tag(:assignment_operator),
-        string("^=") |> tag(:assignment_operator),
-        string("&=") |> tag(:assignment_operator),
-        string("||") |> tag(:logical_operator),
-        string("&&") |> tag(:logical_operator),
-        string("--") |> tag(:update_operator),
-        string("++") |> tag(:update_operator),
-        string("-") |> tag(:binary_operator),
-        string(">") |> tag(:binary_operator),
-        string("<") |> tag(:binary_operator),
-        string("*") |> tag(:binary_operator),
-        string("/") |> tag(:binary_operator),
-        string("%") |> tag(:binary_operator),
-        string("|") |> tag(:binary_operator),
-        string("^") |> tag(:binary_operator),
-        string("&") |> tag(:binary_operator),
-        string("+") |> tag(:binary_operator),
-        string("=") |> tag(:assignment_operator)
-      ])
-      |> reduce({:to_atom_operator, []})
 
-  def to_atom_operator(args) do
-    Enum.map(args, fn
-      {k, [v]}
-      when k in [
-             :assignment_operator,
-             :unary_operator,
-             :maybe_unary_operator,
-             :binary_operator,
-             :update_operator,
-             :logical_operator
-           ] ->
-        {k, [val: String.to_atom(v)]}
+  @operators [
+    # {:"===", , :left},
+    # {:"!==", , :left},
+    # {:">>>", , :left},
+    # {:"<<=", , :left},
+    # {:">>=", , :left},
+    # {:"||",, :left},
+    # {:"&&",, :left},
+    # {:"--",, :left},
+    # {:"++",, :left},
+    # {:">>", , :left},
+    # {:"<<", , :left},
+    # {:"<=", , :left},
+    # {:">=", , :left},
+    # {:"+=",, :left},
+    # {:"-=",, :left},
+    # {:"*=",, :left},
+    # {:"/=",, :left},
+    # {:"%=",, :left},
+    # {:"|=",, :left},
+    # {:"^=",, :left},
+    # {:"&=",, :left},
+    # {:"in", , :left},
+    # {:"instanceof", , :left},
+    {:"=", 3, :left, :binary_expression},
+    {:"-", 14, :left, :binary_expression},
+    # {:">", , :left},
+    # {:"<", , :left},
+    {:"*", 15, :left, :binary_expression},
+    {:"/", 15, :left, :binary_expression},
+    # {:"%", , :left},
+    # {:"|", , :left},
+    # {:"^", , :left},
+    # {:"&", , :left},
+    {:"+", 14, :left, :binary_expression}
+  ]
 
-      a ->
-        a
-    end)
-    |> case do
-      [{_, _} = single_operator] ->
-        single_operator
-      a ->
-        IO.inspect(a, label: "invariant------to_atom_operator----------")
-    end
+
+  def operator do
+    operators =
+      Enum.map(@operators, fn {o, r, a, k} ->
+          o
+          |> Atom.to_string()
+          |> string()
+          |> ignore()
+          |> reduce({__MODULE__, :tag_operator, [o, r, a, k]})
+      end)
+
+    optional(space_chars()) |> choice(operators)
+  end
+
+  def tag_operator(_, opp, rank, assoc, key) do
+    {:op, [id: opp, rank: rank, assoc: assoc, key: key]}
   end
 end
