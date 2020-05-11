@@ -92,7 +92,6 @@ defmodule ExAcorn.Statement do
     :_expression,
     choice([
       function_expression(parsec(:expression), parsec(:_block)),
-      operator(),
       object_expression(parsec(:literal)),
       new_expression(parsec(:expression)),
       member_expression(parsec(:expression)),
@@ -112,12 +111,12 @@ defmodule ExAcorn.Statement do
     |> post_traverse({:scoop_up_in, []})
   )
 
-  defcombinatorp(:expression, optional(whitespace()) |> concat(parsec(:_expression)))
   defcombinatorp(:expressable,
     repeat_while(
-      ignore(space_chars())
+      optional(space_chars())
       |> choice([
         parsec(:literal),
+        grouping_operator(),
         operator(),
         parsec(:expression)
       ])
@@ -126,6 +125,8 @@ defmodule ExAcorn.Statement do
     )
     |> post_traverse({__MODULE__, :resolve_precedence_tree, []})
   )
+
+  defcombinatorp(:expression, optional(whitespace()) |> concat(parsec(:_expression)))
 
   defp scoop_up_in(
          _rest,

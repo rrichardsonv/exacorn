@@ -61,12 +61,32 @@ defmodule ExAcorn.ShuntOnEm do
         to_tree(output_queue, stack)
     end
 
-    defp to_tree(queue, stack), do: do_to_tree(Enum.reverse(queue), stack)
+    defp to_tree(queue, stack) do
+      stack = Enum.map(stack, fn {k, props} -> {k, Keyword.delete(props, :rank)} end)
+      queue = Enum.reverse(queue)
+      do_to_tree(queue, stack)
+    end
 
     defp do_to_tree(queue, []), do: queue
+    defp do_to_tree([{child_token, _} = child | rest], [{next_node, _} = next | stack]) when next_node in [:right_bracket, :right_paren] and child_token != :seq do
+      do_to_tree([format_op_token(next, [child]) | rest], stack)
+    end
     defp do_to_tree(queue, [token | stack]) do
+        _ = IO.inspect(token, label: "token")
         {children, rest} = Enum.split(queue, 2)
         do_to_tree([format_op_token(token, children) | rest], stack)
+    end
+
+    defp format_op_token({:right_bracket, props}, children) do
+      add_children(:bracket_group, props, children)
+    end
+
+    defp format_op_token({:right_paren, props}, children) do
+      add_children(:paren_group, props, children)
+    end
+
+    defp format_op_token({:seq, props}, children) do
+      add_children(:seq, props, children)
     end
 
     defp format_op_token({:op, props}, children) do
@@ -85,9 +105,25 @@ defmodule ExAcorn.ShuntOnEm do
         add_children(token_key, token_props, children)
     end
 
-    defp add_children(:maybe_binary_expression, props, [right]), do: {:unary_expression, props ++ [right: right]}
-    defp add_children(:maybe_binary_expression, props, [right, left]), do: {:binary_expression, props ++ [right: right, left: left]}
-    defp add_children(key, props, [right, left]), do: {key, props ++ [right: right, left: left]}
+    defp add_children(key, props, [{:seq, seq_props}]) when key in [:bracket_group, :paren_group] do
+      {key, Keyword.take(seq_props, [:expressions]) ++ props}
+    end
+
+    defp add_children(:paren_group, _props, [expression]), do: {:paren_group, expression}
+
+    defp add_children(:seq, _props, [first]), do: {:seq, [expressions: [first, nil]]}
+    defp add_children(:seq, _props, [left, {:seq, seq_props}]) do
+      expressions = Keyword.fetch!(seq_props, :expressions)
+      {:seq, [expressions: expressions ++ [left]]}
+    end
+    defp add_children(:seq, props, [first, second]), do: {:seq, [expressions: [first, second]] ++ props}
+    defp add_children(:maybe_binary_expression, props, [right]), do: {:unary_expression, props ++ [right: maybe_ungroup(right)]}
+    defp add_children(:maybe_binary_expression, props, [right, left]), do: {:binary_expression, props ++ [right: maybe_ungroup(right), left: maybe_ungroup(left)]}
+    defp add_children(key, props, [right, left]), do: {key, props ++ [right: maybe_ungroup(right), left: maybe_ungroup(left)]}
+
+
+    defp maybe_ungroup({:paren_group, [expression]}), do: expression
+    defp maybe_ungroup(node), do: node
 
     @spec parse_impl([token()], [token()], [token()]) :: {[token()], [token()], [token()]}
     def parse_impl([], output_queue, stack), do: {[], output_queue, stack}
@@ -95,37 +131,102 @@ defmodule ExAcorn.ShuntOnEm do
         {output_queue, stack} = add_token(first, output_queue, stack)
         parse_impl(rest, output_queue, stack)
     end
+# [1, 2, 2 - 2 * 3]
+# queue | stack [
+# queue 1| stack [
+# queue 1| stack ,[
+# queue 12 | stack ,[
+# queue {:seq, 1,2}2 | stack ,[
+# queue {:seq, 1,2}2 | stack -,[
+# queue {:seq, 1,2}22 | stack -,[
+# queue {:seq, 1,2}223 | stack *-,[
+# queue {:seq, 1,2}223[ | stack *-,[
+# queue {:seq, 1,2, {:op, -, 2, {:op, *, 2, 3}}} | stack *-,[
+
+
+#   2 - 2 * 3
+
+#   223 *-
 
     @spec add_token(token(), [token()], [token()]) :: {[token()], [token()]}
-    def add_token({:left, _} = token, output_queue, stack),
+    def add_token({:right_paren, _} = token, output_queue, stack),
         do: {output_queue, [token | stack]}
 
-    def add_token({:right, _} = token, output_queue, stack),
-        do: add_right_paren(token, output_queue, stack)
+    def add_token({:right_bracket, _} = token, output_queue, stack),
+        do: {output_queue, [token | stack]}
+
+    def add_token({:left_paren, _} = token, output_queue, stack),
+        do: add_left_paren(token, output_queue, stack)
+
+    def add_token({:left_bracket, _} = token, output_queue, stack),
+        do: add_left_bracket(token, output_queue, stack)
 
     def add_token({:op, _} = token, output_queue, stack),
         do: add_operator(token, output_queue, stack)
 
+    def add_token({:seq, _} = token, output_queue, stack),
+        do: add_operator(token, output_queue, stack)
+
     def add_token(token, output_queue, stack),
-        do: {add_to_queue(token, output_queue, 1), stack}
+        do: {add_to_queue(IO.inspect(token, label: "------------token"), output_queue, 1), stack}
 
-    @spec add_right_paren(token(), [token()], [token()]) :: {[token()], [token()]}
-    defp add_right_paren(_token, _output_queue, []),
-        do: raise "Matching parens not found"
-
-    defp add_right_paren(_token, output_queue, [{:left, _} | rest]),
-        do: {output_queue, rest}
-
-    defp add_right_paren(token, output_queue, [top_op | rest]) do
-        condensed_queue =
+    @spec add_left_paren(token(), [token()], [token()]) :: {[token()], [token()]}
+    defp add_left_paren(_token, output_queue, stack) do
+      case maybe_zipper_at(stack, :right_paren) do
+        {inside, found, remaining} ->
+          condensed_queue =
             output_queue
-            |> to_tree([top_op])
+            |> to_tree(inside ++ [found])
             |> Enum.reverse()
 
-        add_right_paren(token, condensed_queue, rest)
+          {condensed_queue, remaining}
+        nil ->
+          IO.inspect(output_queue, label: "queue")
+          IO.inspect(stack, label: "stack")
+          raise "Matching paren not found"
+      end
+    end
+
+    @spec add_left_bracket(token(), [token()], [token()]) :: {[token()], [token()]}
+    defp add_left_bracket(_token, output_queue, stack) do
+      case maybe_zipper_at(stack, :right_bracket) do
+        {inside, found, remaining} ->
+          condensed_queue =
+            output_queue
+            |> to_tree(inside ++ [found])
+            |> Enum.reverse()
+
+          {condensed_queue, remaining}
+        nil ->
+          raise "Matching bracket not found"
+      end
+    end
+
+    defp maybe_zipper_at([], _), do: nil
+    defp maybe_zipper_at(stack, key) do
+      zipper =
+        Enum.split_while(stack, fn
+          {^key, _} ->
+            false
+          _ ->
+            true
+        end)
+
+      case zipper do
+        {bef, [found | aft]} ->
+          {bef, found, aft}
+        {_, []} ->
+          nil
+      end
     end
 
     @spec add_operator(token(), [token()], [token()]) :: {[token()], [token()]}
+    defp add_operator(token, output_queue, [{op_type, _} | _] = stack)
+        when op_type in [:right_bracket, :right_paren] do
+
+        {output_queue, [token | stack]}
+    end
+
     defp add_operator(token, output_queue, stack) do
         {partial_queue, s1} = pop_higher_precendence_ops_to_queue(token, [], stack)
 
@@ -140,8 +241,10 @@ defmodule ExAcorn.ShuntOnEm do
     defp pop_higher_precendence_ops_to_queue(_token, q, []),
         do: {q, []}
 
-    defp pop_higher_precendence_ops_to_queue(_token, q, [{op_type, _} | _] = stack)
-        when op_type in [:right, :left], do: {q, stack}
+    defp pop_higher_precendence_ops_to_queue(token, q, [{op_type, _} | _] = stack)
+        when op_type in [:right_bracket, :right_paren] do
+          {q ++ [token], stack}
+        end
 
     defp pop_higher_precendence_ops_to_queue(token, q, [top_op | rest] = stack) do
         [token, top_op]

@@ -43,8 +43,20 @@ defmodule ExAcorn.Operators do
     {:"|", 8, :left, :binary_expression},
     {:"^", 9, :left, :binary_expression},
     {:"&", 10, :left, :binary_expression},
-    {:"+", 14, :left, :binary_expression}
+    {:"+", 14, :left, :binary_expression},
+    {:".", 20, :left, :member_access}
   ]
+
+  def grouping_operator do
+    optional(space_chars())
+    |> choice([
+      ignore(string("(")) |> reduce({__MODULE__, :tag_special, [:left_paren, 21]}),
+      ignore(string(")")) |> reduce({__MODULE__, :tag_special, [:right_paren, 21]}),
+      ignore(string("[")) |> reduce({__MODULE__, :tag_special, [:left_bracket, 20]}),
+      ignore(string("]")) |> reduce({__MODULE__, :tag_special, [:right_bracket, 20]}),
+      ignore(string(",")) |> reduce({__MODULE__, :tag_special, [:seq, 1]})
+    ])
+  end
 
 
   def operator do
@@ -62,5 +74,9 @@ defmodule ExAcorn.Operators do
 
   def tag_operator(_, opp, rank, assoc, key) do
     {:op, [id: opp, rank: rank, assoc: assoc, key: key]}
+  end
+
+  def tag_special(_, tag_nm, rank) do
+    {tag_nm, [rank: rank]}
   end
 end

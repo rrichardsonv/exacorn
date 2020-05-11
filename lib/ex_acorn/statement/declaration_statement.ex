@@ -36,6 +36,7 @@ defmodule ExAcorn.Statement.DeclarationStatement do
         |> optional(declaration)
         |> tag(:variable_declarator)
       )
+      |> post_traverse({:rollup_sequence, []})
       |> tag(:declarations)
 
     choice([string("let"), string("const"), string("var")])
@@ -44,5 +45,51 @@ defmodule ExAcorn.Statement.DeclarationStatement do
     |> concat(declarations)
     |> ignore(expression_boundary())
     |> tag(:variable_statement)
+  end
+
+  def rollup_sequence(_, args, context, _, _) do
+    args = do_rollup_sequence(args)
+    {args, context}
+  end
+
+
+  defp do_rollup_sequence(args) do
+    Enum.flat_map(args, fn {k, props} = arg ->
+      case Keyword.fetch!(props, :init) do
+        [{:seq, [expressions: exprs]}]->
+          [cur_init | expressions] = Enum.reverse(exprs)
+          props =
+            props
+            |> Keyword.delete(:init)
+            |> Keyword.put(:init, cur_init)
+          [{k, props} | Enum.map(expressions, &to_declaration/1)]
+        _ ->
+          [arg]
+      end
+    end)
+  end
+
+  defp to_declaration({k, props}) do
+    IO.inspect(k, label: "to_declaration({k, props})")
+    {source_loc, rest} = Keyword.split(props, [:end_loc, :start_loc])
+
+    declarator_props =
+      {k, rest}
+      |> do_to_declaration()
+      |> Keyword.put_new(:init, [])
+      |> Enum.concat(source_loc)
+
+    {:variable_declarator, declarator_props}
+  end
+
+  defp do_to_declaration({:binary_expression, props} = init) do
+    props
+    |> Keyword.fetch!(:right)
+    |> do_to_declaration()
+    |> Keyword.put(:init, init)
+  end
+
+  defp do_to_declaration({:identifier, props}) do
+    [id: Keyword.fetch!(props, :name)]
   end
 end
