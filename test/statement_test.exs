@@ -166,6 +166,7 @@ defmodule ExAcorn.StatementTest do
     assert :ok == S.parse(js1)
   end
 
+
   test "literal nonsense" do
     js = """
     var re = /[^@]+@[^@]+/g

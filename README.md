@@ -1,24 +1,27 @@
 # ExAcorn
 
-**TODO: Add description**
+## Setup
 
-## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `ex_acorn` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:ex_acorn, "~> 0.1.0"}
-  ]
-end
+```
+mix deps.get
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/ex_acorn](https://hexdocs.pm/ex_acorn).
+## Usage
 
+Currently super broken, the whole thing needs to be switched over to use proper operator precedence parsing. To see the output run:
 
-<!-- xylem -->
+```
+mix test test/statement_test.exs:212
+```
 
+If you want to jump back to when all the tests parsed everything EXCEPT operator precedence correctly
+
+```
+git checkout 0772080
+```
+
+and run:
+
+```
+mix test test/statement_test.exs
+```
