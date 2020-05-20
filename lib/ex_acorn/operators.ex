@@ -33,7 +33,6 @@ defmodule ExAcorn.Operators do
     {:"&=", 3, :left, :binary_expression},
     {:in, 12, :left, :binary_expression},
     {:instanceof, 12, :left, :binary_expression},
-    {:"=", 3, :left, :binary_expression},
     {:"-", 14, :left, :maybe_binary_expression},
     {:">", 12, :left, :binary_expression},
     {:"<", 12, :left, :binary_expression},
@@ -50,14 +49,15 @@ defmodule ExAcorn.Operators do
   def grouping_operator do
     optional(space_chars())
     |> choice([
-      ignore(string("(")) |> reduce({__MODULE__, :tag_special, [:left_paren, 21]}),
+      ignore(string("(")) |> lookahead_not(string(")")) |> reduce({__MODULE__, :tag_special, [:left_paren, 21]}),
       ignore(string(")")) |> reduce({__MODULE__, :tag_special, [:right_paren, 21]}),
       ignore(string("[")) |> reduce({__MODULE__, :tag_special, [:left_bracket, 20]}),
       ignore(string("]")) |> reduce({__MODULE__, :tag_special, [:right_bracket, 20]}),
-      ignore(string(",")) |> reduce({__MODULE__, :tag_special, [:seq, 1]})
+      ignore(string(",")) |> reduce({__MODULE__, :tag_special, [:seq, 1]}),
+      ignore(string("?")) |> reduce({__MODULE__, :tag_special, [:conditional_start, 4]}),
+      ignore(string(":")) |> reduce({__MODULE__, :tag_special, [:conditional_end, 4]})
     ])
   end
-
 
   def operator do
     operators =
@@ -69,7 +69,8 @@ defmodule ExAcorn.Operators do
           |> reduce({__MODULE__, :tag_operator, [o, r, a, k]})
       end)
 
-    optional(space_chars()) |> choice(operators)
+    optional(space_chars())
+    |> choice(operators ++ [ignore(string("=")) |> lookahead_not(string(">")) |> reduce({__MODULE__, :tag_operator, [:"=", 3, :left, :binary_expression]})])
   end
 
   def tag_operator(_, opp, rank, assoc, key) do
